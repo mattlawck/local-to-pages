@@ -1,0 +1,12 @@
+{
+  "id": "local-to-pages",
+  "name": "Local to Cloudflare Pages",
+  "version": "0.1.0",
+  "description": "Export WordPress via Simply Static and deploy to Cloudflare Pages with llms.txt generation",
+  "author": "Matt Lawrence",
+  "homepage": "",
+  "main": "dist/main.js",
+  "renderer": "dist/renderer.js",
+  "minLocalVersion": "8.0.0",
+  "icon": "icon.png"
+}

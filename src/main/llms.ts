@@ -1,0 +1,237 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import * as https from 'https';
+import * as http from 'http';
+import TurndownService from 'turndown';
+
+export interface WpPage {
+  id: number;
+  slug: string;
+  title: { rendered: string };
+  content: { rendered: string };
+  excerpt: { rendered: string };
+  link: string;
+  type: string;
+}
+
+export interface WpPost extends WpPage {
+  date: string;
+}
+
+/**
+ * Fetches JSON from a URL, following http or https.
+ */
+function fetchJson<T>(url: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https') ? https : http;
+    const req = lib.get(url, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data) as T);
+        } catch (e) {
+          reject(new Error(`Failed to parse JSON from ${url}`));
+        }
+      });
+    }).on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy(new Error(`Request timed out: ${url}`));
+    });
+  });
+}
+
+/**
+ * Escapes special characters for safe inclusion in XML content.
+ */
+export function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Strips HTML tags and decodes basic entities for plain text excerpts.
+ */
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Fetches all published pages and posts from the WP REST API.
+ */
+export async function fetchAllContent(
+  siteUrl: string,
+  onLog: (msg: string) => void,
+): Promise<{ pages: WpPage[]; posts: WpPost[] }> {
+  const base = siteUrl.replace(/\/$/, '');
+
+  // Get the front page ID so we can exclude it (it's served at / already)
+  const siteInfo = await fetchJson<{ page_on_front?: number; show_on_front?: string }>(
+    `${base}/wp-json/`,
+  );
+  const frontPageId = siteInfo.show_on_front === 'page' ? siteInfo.page_on_front : null;
+
+  onLog('Fetching published pages from WordPress REST API...');
+  const pages = await fetchJson<WpPage[]>(
+    `${base}/wp-json/wp/v2/pages?per_page=100&status=publish&_fields=id,slug,title,content,excerpt,link,type`,
+  );
+
+  // Exclude the page set as homepage — it's served at / so its slug URL is redundant
+  const filteredPages = pages.filter((p) => p.id !== frontPageId);
+  onLog(`Found ${filteredPages.length} pages (front page excluded).`);
+
+  onLog('Fetching published posts from WordPress REST API...');
+  const posts = await fetchJson<WpPost[]>(
+    `${base}/wp-json/wp/v2/posts?per_page=100&status=publish&_fields=id,slug,title,content,excerpt,link,type,date`,
+  );
+
+  onLog(`Found ${posts.length} posts.`);
+
+  return { pages: filteredPages, posts };
+}
+
+/**
+ * Generates a clean sitemap.xml from pages and posts, and rewrites robots.txt to point to it.
+ * Replaces the WordPress-generated wp-sitemap.xml which exposes user/author URLs.
+ */
+export async function generateSitemap(opts: {
+  publicUrl: string;
+  outputDir: string;
+  onLog: (msg: string) => void;
+  content: { pages: WpPage[]; posts: WpPost[] };
+}): Promise<void> {
+  opts.onLog('Generating sitemap.xml...');
+
+  const { pages, posts } = opts.content;
+  const base = opts.publicUrl.replace(/\/$/, '');
+
+  const urlEntries = [...pages, ...posts].map((item) => {
+    const loc = escapeXml(`${base}/${item.slug}/`);
+    const lastmod = 'date' in item && typeof (item as WpPost).date === 'string'
+      ? new Date((item as WpPost).date).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0];
+    return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
+  });
+
+  // Always include the homepage
+  urlEntries.unshift(`  <url>\n    <loc>${escapeXml(`${base}/`)}</loc>\n    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n  </url>`);
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries.join('\n')}\n</urlset>\n`;
+
+  fs.writeFileSync(path.join(opts.outputDir, 'sitemap.xml'), xml, 'utf-8');
+  opts.onLog(`sitemap.xml written with ${urlEntries.length} URLs`);
+
+  // Rewrite robots.txt to reference the clean sitemap and block WP admin paths
+  const robots = `User-agent: *\nDisallow: /wp-admin/\nDisallow: /wp-json/\nDisallow: /author/\n\nSitemap: ${base}/sitemap.xml\n`;
+  fs.writeFileSync(path.join(opts.outputDir, 'robots.txt'), robots, 'utf-8');
+  opts.onLog('robots.txt updated');
+}
+
+/**
+ * Generates llms.txt — a structured markdown index for AI agents.
+ * Standard: https://llmstxt.org
+ */
+export async function generateLlmsTxt(opts: {
+  publicUrl: string;
+  siteTitle: string;
+  siteDescription: string;
+  outputDir: string;
+  onLog: (msg: string) => void;
+  content: { pages: WpPage[]; posts: WpPost[] };
+}): Promise<void> {
+  opts.onLog('Generating llms.txt...');
+
+  const { pages, posts } = opts.content;
+  const base = opts.publicUrl.replace(/\/$/, '');
+
+  const lines: string[] = [
+    `# ${opts.siteTitle}`,
+    '',
+    `> ${opts.siteDescription}`,
+    '',
+  ];
+
+  if (pages.length > 0) {
+    lines.push('## Pages', '');
+    for (const page of pages) {
+      const excerpt = stripHtml(page.excerpt.rendered).slice(0, 120);
+      const url = `${base}/${page.slug}/`;
+      lines.push(`- [${page.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
+    }
+    lines.push('');
+  }
+
+  if (posts.length > 0) {
+    lines.push('## Posts', '');
+    for (const post of posts as WpPost[]) {
+      const excerpt = stripHtml(post.excerpt.rendered).slice(0, 120);
+      const url = `${base}/${post.slug}/`;
+      lines.push(`- [${post.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## Also available');
+  lines.push('');
+  lines.push(`- [Full content (llms-full.txt)](${base}/llms-full.txt): Complete text of all pages and posts for AI ingestion`);
+  lines.push('');
+
+  const llmsTxtPath = path.join(opts.outputDir, 'llms.txt');
+  fs.writeFileSync(llmsTxtPath, lines.join('\n'), 'utf-8');
+  opts.onLog(`llms.txt written to ${llmsTxtPath}`);
+}
+
+/**
+ * Generates llms-full.txt — complete site content as clean markdown for AI agents.
+ */
+export async function generateLlmsFullTxt(opts: {
+  publicUrl: string;
+  siteTitle: string;
+  siteDescription: string;
+  outputDir: string;
+  onLog: (msg: string) => void;
+  content: { pages: WpPage[]; posts: WpPost[] };
+}): Promise<void> {
+  opts.onLog('Generating llms-full.txt...');
+
+  const { pages, posts } = opts.content;
+  const td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+  const base = opts.publicUrl.replace(/\/$/, '');
+
+  const sections: string[] = [
+    `# ${opts.siteTitle}`,
+    '',
+    `> ${opts.siteDescription}`,
+    '',
+    '---',
+    '',
+  ];
+
+  const allContent: Array<WpPage | WpPost> = [...pages, ...posts];
+
+  for (const item of allContent) {
+    const url = `${base}/${item.slug}/`;
+    const date = 'date' in item ? `\n*Published: ${new Date((item as WpPost).date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}*` : '';
+    sections.push(`## [${item.title.rendered}](${url})${date}`, '');
+
+    const markdown = td.turndown(item.content.rendered);
+    sections.push(markdown, '', '---', '');
+  }
+
+  const fullPath = path.join(opts.outputDir, 'llms-full.txt');
+  fs.writeFileSync(fullPath, sections.join('\n'), 'utf-8');
+  opts.onLog(`llms-full.txt written to ${fullPath}`);
+}

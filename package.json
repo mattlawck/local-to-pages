@@ -1,0 +1,55 @@
+{
+  "name": "local-to-pages",
+  "version": "0.1.0",
+  "productName": "Local to Cloudflare Pages",
+  "description": "Local by WP Engine add-on: export via Simply Static + deploy to Cloudflare Pages",
+  "author": "Matt Lawrence",
+  "main": "dist/main.js",
+  "renderer": "dist/renderer.js",
+  "files": [
+    "dist/",
+    "favicon-assets/",
+    "icon.png",
+    "local-addon.json",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "./node_modules/.bin/webpack --config webpack.config.js",
+    "build:main": "./node_modules/.bin/webpack --config webpack.config.js --env target=main",
+    "build:renderer": "./node_modules/.bin/webpack --config webpack.config.js --env target=renderer",
+    "watch": "./node_modules/.bin/webpack --config webpack.config.js --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@getflywheel/local": "^9.2.9",
+    "@getflywheel/local-components": "^17.8.1",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@types/react-router-dom": "^5.3.3",
+    "@types/turndown": "^5.0.4",
+    "css-loader": "^6.11.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.37.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "style-loader": "^3.3.4",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^5.1.4"
+  },
+  "peerDependencies": {
+    "electron": "*",
+    "react": "*",
+    "react-dom": "*"
+  }
+}

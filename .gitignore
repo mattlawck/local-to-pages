@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.key
+*.tgz
+.DS_Store
