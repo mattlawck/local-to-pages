@@ -1,6 +1,6 @@
 {
   "name": "local-to-pages",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "productName": "Local to Cloudflare Pages",
   "description": "Local by WP Engine add-on: export via Simply Static + deploy to Cloudflare Pages",
   "author": "Matt Lawrence",
