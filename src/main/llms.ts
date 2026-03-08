@@ -140,12 +140,33 @@ export async function generateSitemap(opts: {
   opts.onLog('robots.txt updated');
 }
 
+export interface LlmsPluginSettings {
+  role: string;
+  github_url: string;
+  linkedin_url: string;
+  optional_slugs: string[];
+}
+
+/**
+ * Fetches settings from the Local to Pages WordPress plugin REST endpoint.
+ * Returns empty defaults if the plugin is not installed.
+ */
+export async function fetchPluginSettings(siteUrl: string): Promise<LlmsPluginSettings> {
+  const base = siteUrl.replace(/\/$/, '');
+  try {
+    return await fetchJson<LlmsPluginSettings>(`${base}/wp-json/local-to-pages/v1/settings`);
+  } catch {
+    return { role: '', github_url: '', linkedin_url: '', optional_slugs: [] };
+  }
+}
+
 /**
  * Generates llms.txt — a structured markdown index for AI agents.
  * Standard: https://llmstxt.org
  */
 export async function generateLlmsTxt(opts: {
   publicUrl: string;
+  siteUrl: string;
   siteTitle: string;
   siteDescription: string;
   outputDir: string;
@@ -157,6 +178,8 @@ export async function generateLlmsTxt(opts: {
   const { pages, posts } = opts.content;
   const base = opts.publicUrl.replace(/\/$/, '');
 
+  const settings = await fetchPluginSettings(opts.siteUrl);
+
   const lines: string[] = [
     `# ${opts.siteTitle}`,
     '',
@@ -164,9 +187,26 @@ export async function generateLlmsTxt(opts: {
     '',
   ];
 
-  if (pages.length > 0) {
-    lines.push('## Pages', '');
-    for (const page of pages) {
+  // Core Identity — only rendered if plugin provides any fields
+  const hasIdentity = settings.role || settings.github_url || settings.linkedin_url;
+  if (hasIdentity) {
+    lines.push('## Core Identity', '');
+    lines.push(`- **Name:** ${opts.siteTitle}`);
+    if (settings.role) lines.push(`- **Role:** ${settings.role}`);
+    lines.push(`- **Primary Domain:** ${base}/`);
+    if (settings.github_url) lines.push(`- **GitHub:** ${settings.github_url}`);
+    if (settings.linkedin_url) lines.push(`- **LinkedIn:** ${settings.linkedin_url}`);
+    lines.push('');
+  }
+
+  // Split pages into Key Resources and Optional
+  const optionalSlugs = new Set(settings.optional_slugs);
+  const keyPages = pages.filter((p) => !optionalSlugs.has(p.slug));
+  const optionalPages = pages.filter((p) => optionalSlugs.has(p.slug));
+
+  if (keyPages.length > 0) {
+    lines.push('## Key Resources', '');
+    for (const page of keyPages) {
       const excerpt = stripHtml(page.excerpt.rendered).slice(0, 120);
       const url = `${base}/${page.slug}/`;
       lines.push(`- [${page.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
@@ -184,9 +224,19 @@ export async function generateLlmsTxt(opts: {
     lines.push('');
   }
 
-  lines.push('## Also available');
-  lines.push('');
+  if (optionalPages.length > 0) {
+    lines.push('## Optional / Background', '');
+    for (const page of optionalPages) {
+      const excerpt = stripHtml(page.excerpt.rendered).slice(0, 120);
+      const url = `${base}/${page.slug}/`;
+      lines.push(`- [${page.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## Technical Documentation for Agents', '');
   lines.push(`- [Full content (llms-full.txt)](${base}/llms-full.txt): Complete text of all pages and posts for AI ingestion`);
+  lines.push(`- [Sitemap](${base}/sitemap.xml): XML sitemap for comprehensive crawling`);
   lines.push('');
 
   const llmsTxtPath = path.join(opts.outputDir, 'llms.txt');
@@ -210,13 +260,13 @@ export async function generateLlmsFullTxt(opts: {
   const { pages, posts } = opts.content;
   const td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
   const base = opts.publicUrl.replace(/\/$/, '');
+  const today = new Date().toISOString().split('T')[0];
 
   const sections: string[] = [
-    `# ${opts.siteTitle}`,
+    `# ${opts.siteTitle} - Full Content Repository`,
     '',
-    `> ${opts.siteDescription}`,
-    '',
-    '---',
+    `> Last Updated: ${today}`,
+    `> Metadata: ${opts.siteDescription}`,
     '',
   ];
 
@@ -224,11 +274,21 @@ export async function generateLlmsFullTxt(opts: {
 
   for (const item of allContent) {
     const url = `${base}/${item.slug}/`;
-    const date = 'date' in item ? `\n*Published: ${new Date((item as WpPost).date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}*` : '';
-    sections.push(`## [${item.title.rendered}](${url})${date}`, '');
+    const date = 'date' in item
+      ? new Date((item as WpPost).date).toISOString().split('T')[0]
+      : today;
+    const summary = stripHtml(item.excerpt.rendered).slice(0, 200);
+
+    sections.push(
+      `<article id="${item.slug}">`,
+      `## ${item.title.rendered}`,
+      `**Date:** ${date}`,
+      `**URL:** ${url}`,
+      ...(summary ? [`**Summary:** ${summary}`, ''] : ['']),
+    );
 
     const markdown = td.turndown(item.content.rendered);
-    sections.push(markdown, '', '---', '');
+    sections.push(markdown, '', '</article>', '');
   }
 
   const fullPath = path.join(opts.outputDir, 'llms-full.txt');

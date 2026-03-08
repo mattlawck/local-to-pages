@@ -60,6 +60,7 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
   const content = await fetchAllContent(ctx.siteUrl, ctx.onLog);
   const llmsOpts = {
     publicUrl,
+    siteUrl: ctx.siteUrl,
     siteTitle: ctx.siteTitle,
     siteDescription: ctx.siteDescription,
     outputDir: ctx.config.staticOutputDir,
