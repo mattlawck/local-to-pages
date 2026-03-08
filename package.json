@@ -5,7 +5,7 @@
   "description": "Deploy your WordPress site as a static site to Cloudflare Pages with llms.txt generation.",
   "author": "Matt Lawrence",
   "icon": "icon.png",
-  "bgColor": "#1d1d1d",
+  "bgColor": "#51bb7b",
   "main": "dist/main.js",
   "renderer": "dist/renderer.js",
   "files": [

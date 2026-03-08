@@ -77,15 +77,19 @@ export default function(): void {
   ipcMain.on(IPC.START_DEPLOY, async (event: Electron.IpcMainEvent, siteId: string) => {
     const send = (channel: string, data: unknown) => event.sender.send(channel, data);
 
-    const serviceContainer = LocalMain.getServiceContainer().cradle;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const site = (serviceContainer as any).siteData.getSite(siteId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const status = (serviceContainer as any).siteProvisioner.getSiteStatus(site);
+    try {
+      const serviceContainer = LocalMain.getServiceContainer().cradle;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const site = (serviceContainer as any).siteData.getSite(siteId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const status = (serviceContainer as any).siteProvisioner.getSiteStatus(site);
 
-    if (status !== 'running') {
-      send(IPC.SITE_NOT_RUNNING, { siteId });
-      return;
+      if (status !== 'running') {
+        send(IPC.SITE_NOT_RUNNING, { siteId });
+        return;
+      }
+    } catch {
+      // If status check fails, proceed with deploy and let it surface any real errors
     }
 
     await executeDeploy(event, siteId);

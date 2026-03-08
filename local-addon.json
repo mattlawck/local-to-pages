@@ -9,5 +9,5 @@
   "renderer": "dist/renderer.js",
   "minLocalVersion": "8.0.0",
   "icon": "icon.png",
-  "bgColor": "#1d1d1d"
+  "bgColor": "#51bb7b"
 }
