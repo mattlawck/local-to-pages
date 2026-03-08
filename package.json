@@ -24,7 +24,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "electron-store": "^8.2.0",
+    "electron-store": "^11.0.2",
     "turndown": "^7.2.0"
   },
   "devDependencies": {
