@@ -30,7 +30,7 @@ function fetchJson<T>(url: string): Promise<T> {
       res.on('end', () => {
         try {
           resolve(JSON.parse(data) as T);
-        } catch (e) {
+        } catch {
           reject(new Error(`Failed to parse JSON from ${url}`));
         }
       });

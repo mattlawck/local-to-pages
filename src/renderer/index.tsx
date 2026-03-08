@@ -2,7 +2,6 @@ import React from 'react';
 import { ipcRenderer } from 'electron';
 import { App } from './App';
 
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function(context: any): void {
   const { hooks } = context;
