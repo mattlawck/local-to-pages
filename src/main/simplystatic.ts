@@ -61,7 +61,7 @@ export interface WpCliOptions {
  * Returns the MySQL Unix socket path for a Local site.
  * Local places it at: ~/Library/Application Support/Local/run/<siteId>/mysql/mysqld.sock
  */
-function findMysqlSocket(siteId: string): string | null {
+export function findMysqlSocket(siteId: string): string | null {
   const socketPath = path.join(
     process.env.HOME || '',
     'Library',
