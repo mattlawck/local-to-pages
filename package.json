@@ -2,8 +2,10 @@
   "name": "local-to-pages",
   "version": "0.1.1",
   "productName": "Local to Cloudflare Pages",
-  "description": "Local by WP Engine add-on: export via Simply Static + deploy to Cloudflare Pages",
+  "description": "Deploy your WordPress site as a static site to Cloudflare Pages with llms.txt generation.",
   "author": "Matt Lawrence",
+  "icon": "icon.png",
+  "bgColor": "#1d1d1d",
   "main": "dist/main.js",
   "renderer": "dist/renderer.js",
   "files": [
