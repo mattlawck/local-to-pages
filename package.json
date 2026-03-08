@@ -18,6 +18,7 @@
     "build:main": "./node_modules/.bin/webpack --config webpack.config.js --env target=main",
     "build:renderer": "./node_modules/.bin/webpack --config webpack.config.js --env target=renderer",
     "watch": "./node_modules/.bin/webpack --config webpack.config.js --watch",
+    "version": "node -e \"const fs=require('fs');const a=JSON.parse(fs.readFileSync('local-addon.json','utf8'));a.version=process.env.npm_package_version;fs.writeFileSync('local-addon.json',JSON.stringify(a,null,2)+'\\n');\" && git add local-addon.json",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "test": "vitest run"
