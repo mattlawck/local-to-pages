@@ -91,21 +91,4 @@ export default function(): void {
     await executeDeploy(event, siteId);
   });
 
-  ipcMain.on(IPC.START_SITE, async (event: Electron.IpcMainEvent, siteId: string) => {
-    const send = (channel: string, data: unknown) => event.sender.send(channel, data);
-
-    try {
-      const serviceContainer = LocalMain.getServiceContainer().cradle;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const site = (serviceContainer as any).siteData.getSite(siteId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (serviceContainer as any).siteProcessManager.start(site);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      send(IPC.ERROR, { siteId, error: `Failed to start site: ${message}` });
-      return;
-    }
-
-    await executeDeploy(event, siteId);
-  });
 }

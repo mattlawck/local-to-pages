@@ -9,7 +9,7 @@ interface Props {
   error?: string;
   onDeploy: () => void;
   siteNotRunning?: boolean;
-  onStartAndDeploy?: () => void;
+  onCancelNotRunning?: () => void;
 }
 
 const STEPS: Array<{ key: DeployStep; label: string }> = [
@@ -30,7 +30,7 @@ export const DeployPanel: React.FC<Props> = ({
   error,
   onDeploy,
   siteNotRunning,
-  onStartAndDeploy,
+  onCancelNotRunning,
 }) => {
   const logRef = React.useRef<HTMLDivElement>(null);
   const isRunning =
@@ -88,12 +88,12 @@ export const DeployPanel: React.FC<Props> = ({
       {/* Site not running prompt */}
       {siteNotRunning && !isRunning && (
         <div style={styles.warningBox}>
-          <div style={styles.warningText}>Your Local site is not running. Start it to deploy.</div>
+          <div style={styles.warningText}>Your Local site is not running. Start it in Local, then click Retry.</div>
           <div style={styles.warningActions}>
-            <button style={styles.startButton} onClick={onStartAndDeploy}>
-              Start Site &amp; Deploy
+            <button style={styles.startButton} onClick={onDeploy}>
+              Retry
             </button>
-            <button style={styles.cancelButton} onClick={onDeploy}>
+            <button style={styles.cancelButton} onClick={onCancelNotRunning}>
               Cancel
             </button>
           </div>
