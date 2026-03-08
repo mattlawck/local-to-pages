@@ -33,20 +33,15 @@ On each deploy:
 
 ## Installation
 
-1. Download or clone this repo into Local's add-ons directory:
-   ```
-   ~/Library/Application Support/Local/addons/local-to-pages/
-   ```
-   To open this folder in Finder: press **⌘ Shift G**, paste the path above, and press Enter.
+1. Go to the [Releases page](https://github.com/mattlawck/local-to-pages/releases) and download the `.tgz` file from the latest release (listed under **Assets**).
 
-2. Open Terminal and run:
-   ```bash
-   cd ~/Library/Application\ Support/Local/addons/local-to-pages
-   npm install --include=dev --legacy-peer-deps
-   npm run build
-   ```
+2. Open **Local by WP Engine**.
 
-3. Restart Local — the add-on appears in the site sidebar under **Cloudflare Pages**
+3. In the menu bar, click **Local** → **Preferences** (or press **⌘,**), then go to the **Add-ons** tab.
+
+4. Click **Install add-on from disk**, select the `.tgz` file you downloaded, and click **Open**.
+
+5. Restart Local when prompted — the add-on appears in the site sidebar under **Cloudflare Pages**.
 
 ## Configuration
 
