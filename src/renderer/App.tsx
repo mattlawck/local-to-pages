@@ -92,10 +92,9 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
     ipcRenderer.send(IPC.START_DEPLOY, siteId);
   };
 
-  const handleStartAndDeploy = () => {
+  const handleCancelNotRunning = () => {
     setSiteNotRunning(false);
-    setDeployState({ step: 'exporting', logs: [] });
-    ipcRenderer.send(IPC.START_SITE, siteId);
+    setDeployState((prev) => ({ ...prev, step: 'idle' }));
   };
 
   return (
@@ -114,7 +113,7 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
             error={deployState.error}
             onDeploy={handleDeploy}
             siteNotRunning={siteNotRunning}
-            onStartAndDeploy={handleStartAndDeploy}
+            onCancelNotRunning={handleCancelNotRunning}
           />
         ) : (
           <ConfigPanel siteId={siteId} config={config} onSave={handleSaveConfig} />
