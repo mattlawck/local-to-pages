@@ -46,6 +46,7 @@ export interface ErrorEvent {
 export const IPC = {
   // renderer → main
   START_DEPLOY: 'local-to-pages:start-deploy',
+  START_SITE: 'local-to-pages:start-site',
   GET_CONFIG: 'local-to-pages:get-config',
   SAVE_CONFIG: 'local-to-pages:save-config',
 
@@ -55,4 +56,5 @@ export const IPC = {
   DONE: 'local-to-pages:done',
   ERROR: 'local-to-pages:error',
   CONFIG_DATA: 'local-to-pages:config-data',
+  SITE_NOT_RUNNING: 'local-to-pages:site-not-running',
 } as const;

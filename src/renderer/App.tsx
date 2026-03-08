@@ -34,6 +34,7 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
     step: 'idle',
     logs: [],
   });
+  const [siteNotRunning, setSiteNotRunning] = React.useState(false);
 
   React.useEffect(() => {
     ipcRenderer.send(IPC.GET_CONFIG, siteId);
@@ -57,12 +58,18 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
       if (payload.siteId !== siteId) return;
       setDeployState((prev) => ({ ...prev, step: 'error', error: payload.error }));
     };
+    const onSiteNotRunning = (_: unknown, payload: { siteId: string }) => {
+      if (payload.siteId !== siteId) return;
+      setSiteNotRunning(true);
+      setDeployState((prev) => ({ ...prev, step: 'idle' }));
+    };
 
     ipcRenderer.on(IPC.CONFIG_DATA, onConfig);
     ipcRenderer.on(IPC.LOG, onLog);
     ipcRenderer.on(IPC.STEP, onStep);
     ipcRenderer.on(IPC.DONE, onDone);
     ipcRenderer.on(IPC.ERROR, onError);
+    ipcRenderer.on(IPC.SITE_NOT_RUNNING, onSiteNotRunning);
 
     return () => {
       ipcRenderer.removeListener(IPC.CONFIG_DATA, onConfig);
@@ -70,6 +77,7 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
       ipcRenderer.removeListener(IPC.STEP, onStep);
       ipcRenderer.removeListener(IPC.DONE, onDone);
       ipcRenderer.removeListener(IPC.ERROR, onError);
+      ipcRenderer.removeListener(IPC.SITE_NOT_RUNNING, onSiteNotRunning);
     };
   }, [siteId, ipcRenderer]);
 
@@ -79,8 +87,15 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
   };
 
   const handleDeploy = () => {
+    setSiteNotRunning(false);
     setDeployState({ step: 'exporting', logs: [] });
     ipcRenderer.send(IPC.START_DEPLOY, siteId);
+  };
+
+  const handleStartAndDeploy = () => {
+    setSiteNotRunning(false);
+    setDeployState({ step: 'exporting', logs: [] });
+    ipcRenderer.send(IPC.START_SITE, siteId);
   };
 
   return (
@@ -98,6 +113,8 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
             pagesUrl={deployState.pagesUrl}
             error={deployState.error}
             onDeploy={handleDeploy}
+            siteNotRunning={siteNotRunning}
+            onStartAndDeploy={handleStartAndDeploy}
           />
         ) : (
           <ConfigPanel siteId={siteId} config={config} onSave={handleSaveConfig} />
@@ -114,8 +131,8 @@ const TabButton: React.FC<{ label: string; active: boolean; onClick: () => void 
     onClick={onClick}
     style={{
       ...styles.tab,
-      borderBottom: active ? '2px solid #7b61ff' : '2px solid transparent',
-      color: active ? '#7b61ff' : '#666',
+      borderBottom: active ? '2px solid #51bb7b' : '2px solid transparent',
+      color: active ? '#51bb7b' : '#666',
       fontWeight: active ? 600 : 400,
     }}
   >

@@ -8,6 +8,8 @@ interface Props {
   pagesUrl?: string;
   error?: string;
   onDeploy: () => void;
+  siteNotRunning?: boolean;
+  onStartAndDeploy?: () => void;
 }
 
 const STEPS: Array<{ key: DeployStep; label: string }> = [
@@ -27,6 +29,8 @@ export const DeployPanel: React.FC<Props> = ({
   pagesUrl,
   error,
   onDeploy,
+  siteNotRunning,
+  onStartAndDeploy,
 }) => {
   const logRef = React.useRef<HTMLDivElement>(null);
   const isRunning =
@@ -61,7 +65,7 @@ export const DeployPanel: React.FC<Props> = ({
                     : isDone
                     ? '#38a169'
                     : isActive
-                    ? '#7b61ff'
+                    ? '#51bb7b'
                     : '#d0d0d0',
                 }}
               >
@@ -81,18 +85,35 @@ export const DeployPanel: React.FC<Props> = ({
         })}
       </div>
 
+      {/* Site not running prompt */}
+      {siteNotRunning && !isRunning && (
+        <div style={styles.warningBox}>
+          <div style={styles.warningText}>Your Local site is not running. Start it to deploy.</div>
+          <div style={styles.warningActions}>
+            <button style={styles.startButton} onClick={onStartAndDeploy}>
+              Start Site &amp; Deploy
+            </button>
+            <button style={styles.cancelButton} onClick={onDeploy}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Deploy button */}
-      <button
-        onClick={onDeploy}
-        disabled={isRunning}
-        style={{
-          ...styles.deployButton,
-          opacity: isRunning ? 0.6 : 1,
-          cursor: isRunning ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {isRunning ? 'Deploying...' : step === 'done' ? 'Deploy Again' : 'Deploy'}
-      </button>
+      {!siteNotRunning && (
+        <button
+          onClick={onDeploy}
+          disabled={isRunning}
+          style={{
+            ...styles.deployButton,
+            opacity: isRunning ? 0.6 : 1,
+            cursor: isRunning ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isRunning ? 'Deploying...' : step === 'done' ? 'Deploy Again' : 'Deploy'}
+        </button>
+      )}
 
       {/* Success URL */}
       {pagesUrl && step === 'done' && (
@@ -167,7 +188,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   deployButton: {
     padding: '10px 28px',
-    background: '#7b61ff',
+    background: '#51bb7b',
     color: '#fff',
     border: 'none',
     borderRadius: '4px',
@@ -188,7 +209,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   link: {
-    color: '#7b61ff',
+    color: '#51bb7b',
     textDecoration: 'none',
   },
   errorBox: {
@@ -213,5 +234,40 @@ const styles: Record<string, React.CSSProperties> = {
   logLine: {
     color: '#d0d0d0',
     wordBreak: 'break-all',
+  },
+  warningBox: {
+    padding: '12px 14px',
+    background: '#fffbeb',
+    border: '1px solid #d97706',
+    borderRadius: '4px',
+    fontSize: '13px',
+    marginBottom: '16px',
+  },
+  warningText: {
+    color: '#92400e',
+    marginBottom: '10px',
+  },
+  warningActions: {
+    display: 'flex',
+    gap: '8px',
+  },
+  startButton: {
+    padding: '8px 16px',
+    background: '#51bb7b',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  cancelButton: {
+    padding: '8px 16px',
+    background: 'none',
+    color: '#5d5e5e',
+    border: '1px solid #e7e7e7',
+    borderRadius: '4px',
+    fontSize: '13px',
+    cursor: 'pointer',
   },
 };

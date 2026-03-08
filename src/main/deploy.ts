@@ -21,7 +21,7 @@ export interface DeployContext {
 
 /**
  * Full deploy pipeline:
- * 1. Simply Static export
+ * 1. Staatic export
  * 2. Generate llms.txt + llms-full.txt
  * 3. Deploy to Cloudflare Pages
  *
