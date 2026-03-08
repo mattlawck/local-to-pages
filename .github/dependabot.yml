@@ -10,3 +10,7 @@ updates:
         dependency-type: "development"
       production-dependencies:
         dependency-type: "production"
+    ignore:
+      # electron-store v9+ is ESM-only and incompatible with our CommonJS webpack build
+      - dependency-name: "electron-store"
+        update-types: ["version-update:semver-major"]
