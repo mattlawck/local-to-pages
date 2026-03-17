@@ -3,7 +3,7 @@ import { ipcRenderer } from 'electron';
 import { App } from './App';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function(context: any): void {
+export default function init(context: any): void {
   const { hooks } = context;
 
   hooks.addFilter('siteInfoToolsItem', (items: Array<unknown>) => {

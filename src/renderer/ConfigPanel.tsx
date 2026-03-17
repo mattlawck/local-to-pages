@@ -2,7 +2,6 @@ import * as React from 'react';
 import { SiteConfig } from '../shared/types';
 
 interface Props {
-  siteId: string;
   config: SiteConfig;
   onSave: (config: SiteConfig) => void;
 }
@@ -70,8 +69,9 @@ export const ConfigPanel: React.FC<Props> = ({ config, onSave }) => {
       />
 
       <div style={styles.field}>
-        <label style={styles.label}>Custom Redirects</label>
+        <label style={styles.label} htmlFor="customRedirects">Custom Redirects</label>
         <textarea
+          id="customRedirects"
           value={form.customRedirects}
           onChange={(e) => handleChange('customRedirects', e.target.value)}
           placeholder={`/old-page/ /new-page/ 301\n/another/ / 302`}

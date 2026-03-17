@@ -43,6 +43,10 @@ export const DeployPanel: React.FC<Props> = ({
     }
   }, [logs]);
 
+  let deployLabel = 'Deploy';
+  if (isRunning) deployLabel = 'Deploying...';
+  else if (step === 'done') deployLabel = 'Deploy Again';
+
   return (
     <div style={styles.container}>
       <h3 style={styles.heading}>Deploy to Cloudflare Pages</h3>
@@ -55,21 +59,19 @@ export const DeployPanel: React.FC<Props> = ({
           const isActive = s.key === step;
           const isError = step === 'error' && isActive;
 
+          let dotBackground = '#d0d0d0';
+          if (isError) dotBackground = '#e53e3e';
+          else if (isDone) dotBackground = '#38a169';
+          else if (isActive) dotBackground = '#51bb7b';
+
+          let dotLabel: React.ReactNode = i + 1;
+          if (isDone) dotLabel = '✓';
+          else if (isActive && !isError) dotLabel = '…';
+
           return (
             <div key={s.key} style={styles.stepRow}>
-              <div
-                style={{
-                  ...styles.stepDot,
-                  background: isError
-                    ? '#e53e3e'
-                    : isDone
-                    ? '#38a169'
-                    : isActive
-                    ? '#51bb7b'
-                    : '#d0d0d0',
-                }}
-              >
-                {isDone ? '✓' : isActive && !isError ? '…' : i + 1}
+              <div style={{ ...styles.stepDot, background: dotBackground }}>
+                {dotLabel}
               </div>
               <span
                 style={{
@@ -111,7 +113,7 @@ export const DeployPanel: React.FC<Props> = ({
             cursor: isRunning ? 'not-allowed' : 'pointer',
           }}
         >
-          {isRunning ? 'Deploying...' : step === 'done' ? 'Deploy Again' : 'Deploy'}
+          {deployLabel}
         </button>
       )}
 
@@ -141,7 +143,7 @@ export const DeployPanel: React.FC<Props> = ({
       {logs.length > 0 && (
         <div ref={logRef} style={styles.logBox}>
           {logs.map((line, i) => (
-            <div key={i} style={styles.logLine}>
+            <div key={`${i}:${line}`} style={styles.logLine}>
               {line}
             </div>
           ))}

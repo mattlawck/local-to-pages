@@ -1,8 +1,8 @@
 // Generates a 64x64 PNG icon with a purple background and white lightning bolt
 // Uses only Node.js built-ins (zlib) — no external dependencies
-const zlib = require('zlib');
-const fs = require('fs');
-const path = require('path');
+const zlib = require('node:zlib');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const SIZE = 64;
 
@@ -66,7 +66,7 @@ function crc32(buf) {
     for (let j = 0; j < 8; j++) c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
     table[i] = c;
   }
-  for (let i = 0; i < buf.length; i++) crc = table[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+  for (const byte of buf) crc = table[(crc ^ byte) & 0xFF] ^ (crc >>> 8);
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 

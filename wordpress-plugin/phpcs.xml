@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<ruleset name="Local to Pages Plugin">
+    <description>WordPress Coding Standards for the Local to Pages plugin.</description>
+
+    <file>local-to-pages/</file>
+
+    <rule ref="WordPress">
+        <!-- Plugin is single-file; prefix check is overly strict for this scope -->
+        <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+    </rule>
+
+    <config name="minimum_supported_wp_version" value="6.0"/>
+
+    <!-- Treat all files as UTF-8 -->
+    <arg name="encoding" value="utf-8"/>
+
+    <!-- Show sniff codes in reports -->
+    <arg value="sp"/>
+</ruleset>
