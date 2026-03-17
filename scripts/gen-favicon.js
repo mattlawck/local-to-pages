@@ -4,9 +4,9 @@
  * Design: black square, white capital M using 4 thick strokes.
  */
 
-const zlib = require('zlib');
-const fs   = require('fs');
-const path = require('path');
+const zlib = require('node:zlib');
+const fs   = require('node:fs');
+const path = require('node:path');
 
 const OUT = path.join(__dirname, '..', 'favicon-assets');
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT);
@@ -21,7 +21,7 @@ for (let i = 0; i < 256; i++) {
 }
 function crc32(buf) {
   let c = 0xFFFFFFFF;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xFF] ^ (c >>> 8);
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 function pngChunk(type, data) {

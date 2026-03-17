@@ -1,7 +1,7 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as https from 'https';
-import * as http from 'http';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as https from 'node:https';
+import * as http from 'node:http';
 import TurndownService from 'turndown';
 
 export interface WpPage {
@@ -46,11 +46,11 @@ function fetchJson<T>(url: string): Promise<T> {
  */
 export function escapeXml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
 }
 
 /**
@@ -58,14 +58,14 @@ export function escapeXml(str: string): string {
  */
 export function stripHtml(html: string): string {
   return html
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/<[^>]{0,2000}>/g, ' ')
+    .replaceAll('&amp;', '&')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#039;', "'")
+    .replaceAll('&nbsp;', ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim();
 }
 
@@ -120,14 +120,16 @@ export async function generateSitemap(opts: {
 
   const urlEntries = [...pages, ...posts].map((item) => {
     const loc = escapeXml(`${base}/${item.slug}/`);
-    const lastmod = 'date' in item && typeof (item as WpPost).date === 'string'
-      ? new Date((item as WpPost).date).toISOString().split('T')[0]
+    const lastmod = 'date' in item && typeof item.date === 'string'
+      ? new Date(item.date).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0];
     return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
   });
 
   // Always include the homepage
-  urlEntries.unshift(`  <url>\n    <loc>${escapeXml(`${base}/`)}</loc>\n    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>\n  </url>`);
+  const homepageLoc = escapeXml(base + '/');
+  const homepageDate = new Date().toISOString().split('T')[0];
+  urlEntries.unshift(`  <url>\n    <loc>${homepageLoc}</loc>\n    <lastmod>${homepageDate}</lastmod>\n  </url>`);
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries.join('\n')}\n</urlset>\n`;
 
@@ -190,8 +192,7 @@ export async function generateLlmsTxt(opts: {
   // Core Identity — only rendered if plugin provides any fields
   const hasIdentity = settings.role || settings.github_url || settings.linkedin_url;
   if (hasIdentity) {
-    lines.push('## Core Identity', '');
-    lines.push(`- **Name:** ${opts.siteTitle}`);
+    lines.push('## Core Identity', '', `- **Name:** ${opts.siteTitle}`);
     if (settings.role) lines.push(`- **Role:** ${settings.role}`);
     lines.push(`- **Primary Domain:** ${base}/`);
     if (settings.github_url) lines.push(`- **GitHub:** ${settings.github_url}`);
@@ -216,7 +217,7 @@ export async function generateLlmsTxt(opts: {
 
   if (posts.length > 0) {
     lines.push('## Posts', '');
-    for (const post of posts as WpPost[]) {
+    for (const post of posts) {
       const excerpt = stripHtml(post.excerpt.rendered).slice(0, 120);
       const url = `${base}/${post.slug}/`;
       lines.push(`- [${post.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
@@ -234,10 +235,13 @@ export async function generateLlmsTxt(opts: {
     lines.push('');
   }
 
-  lines.push('## Technical Documentation for Agents', '');
-  lines.push(`- [Full content (llms-full.txt)](${base}/llms-full.txt): Complete text of all pages and posts for AI ingestion`);
-  lines.push(`- [Sitemap](${base}/sitemap.xml): XML sitemap for comprehensive crawling`);
-  lines.push('');
+  lines.push(
+    '## Technical Documentation for Agents',
+    '',
+    `- [Full content (llms-full.txt)](${base}/llms-full.txt): Complete text of all pages and posts for AI ingestion`,
+    `- [Sitemap](${base}/sitemap.xml): XML sitemap for comprehensive crawling`,
+    '',
+  );
 
   const llmsTxtPath = path.join(opts.outputDir, 'llms.txt');
   fs.writeFileSync(llmsTxtPath, lines.join('\n'), 'utf-8');
@@ -275,7 +279,7 @@ export async function generateLlmsFullTxt(opts: {
   for (const item of allContent) {
     const url = `${base}/${item.slug}/`;
     const date = 'date' in item
-      ? new Date((item as WpPost).date).toISOString().split('T')[0]
+      ? new Date(item.date).toISOString().split('T')[0]
       : today;
     const summary = stripHtml(item.excerpt.rendered).slice(0, 200);
 

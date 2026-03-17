@@ -62,7 +62,7 @@ async function executeDeploy(event: Electron.IpcMainEvent, siteId: string): Prom
   }
 }
 
-export default function(): void {
+export default function init(): void {
   ipcMain.on(IPC.GET_CONFIG, (event: Electron.IpcMainEvent, siteId: string) => {
     const config = getConfig(siteId);
     event.reply(IPC.CONFIG_DATA, { siteId, config });

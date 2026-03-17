@@ -1,6 +1,6 @@
-import { execFile } from 'child_process';
-import * as path from 'path';
-import * as fs from 'fs';
+import { execFile } from 'node:child_process';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 /**
  * Resolves the WP-CLI phar bundled inside the Local.app bundle.

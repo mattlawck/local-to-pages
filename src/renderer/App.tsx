@@ -116,7 +116,7 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
             onCancelNotRunning={handleCancelNotRunning}
           />
         ) : (
-          <ConfigPanel siteId={siteId} config={config} onSave={handleSaveConfig} />
+          <ConfigPanel config={config} onSave={handleSaveConfig} />
         )}
       </div>
     </div>
