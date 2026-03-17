@@ -31,3 +31,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: PHP lint (WordPress plugin)
+        run: |
+          cd wordpress-plugin
+          composer install --no-interaction
+          composer lint
