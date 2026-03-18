@@ -199,7 +199,7 @@ function injectPersonSchema(
   if (sameAs.length > 0) schema['sameAs'] = sameAs;
 
   // Escape </script> sequences to prevent script tag injection from network-sourced field values
-  const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', '<\\/');
+  const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', String.raw`<\/`);
   const block = `<script type="application/ld+json">\n${safeJson}\n</script>`;
 
   let count = 0;
