@@ -47,6 +47,9 @@ add_action(
 			'role'           => 'Author Role / Tagline',
 			'github_url'     => 'GitHub URL',
 			'linkedin_url'   => 'LinkedIn URL',
+			'employer_name'  => 'Employer Name',
+			'employer_url'   => 'Employer URL',
+			'knows_about'    => 'Areas of Expertise (comma-separated)',
 			'optional_slugs' => 'Optional Page Slugs (comma-separated)',
 		);
 
@@ -74,7 +77,7 @@ add_action(
  */
 function ltp_sanitize( $input ) {
 	$clean = array();
-	foreach ( array( 'role', 'github_url', 'linkedin_url', 'optional_slugs' ) as $key ) {
+	foreach ( array( 'role', 'github_url', 'linkedin_url', 'employer_name', 'employer_url', 'knows_about', 'optional_slugs' ) as $key ) {
 		$clean[ $key ] = sanitize_text_field( isset( $input[ $key ] ) ? $input[ $key ] : '' );
 	}
 	return $clean;
@@ -119,12 +122,21 @@ add_action(
 							array_map( 'trim', explode( ',', $optional_raw ) )
 						)
 					);
+					$knows_raw   = isset( $options['knows_about'] ) ? $options['knows_about'] : '';
+					$knows_about = array_values(
+						array_filter(
+							array_map( 'trim', explode( ',', $knows_raw ) )
+						)
+					);
 
 					return rest_ensure_response(
 						array(
 							'role'           => isset( $options['role'] ) ? $options['role'] : '',
 							'github_url'     => isset( $options['github_url'] ) ? $options['github_url'] : '',
 							'linkedin_url'   => isset( $options['linkedin_url'] ) ? $options['linkedin_url'] : '',
+							'employer_name'  => isset( $options['employer_name'] ) ? $options['employer_name'] : '',
+							'employer_url'   => isset( $options['employer_url'] ) ? $options['employer_url'] : '',
+							'knows_about'    => $knows_about,
 							'optional_slugs' => $optional_slugs,
 						)
 					);

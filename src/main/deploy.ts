@@ -188,10 +188,18 @@ function injectPersonSchema(
     'url': publicUrl.replaceAll(/\/$/g, ''),
   };
   if (settings.role) schema['jobTitle'] = settings.role;
+  if (settings.employer_name) {
+    schema['worksFor'] = {
+      '@type': 'Organization',
+      'name': settings.employer_name,
+      ...(settings.employer_url ? { 'url': settings.employer_url } : {}),
+    };
+  }
+  if (settings.knows_about.length > 0) schema['knowsAbout'] = settings.knows_about;
   if (sameAs.length > 0) schema['sameAs'] = sameAs;
 
   // Escape </script> sequences to prevent script tag injection from network-sourced field values
-  const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', '<\\/');
+  const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', String.raw`<\/`);
   const block = `<script type="application/ld+json">\n${safeJson}\n</script>`;
 
   let count = 0;
