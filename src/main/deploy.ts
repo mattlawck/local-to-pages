@@ -78,7 +78,6 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
   ctx.onStep('hardening');
   ctx.onLog('--- Step 2.5: Writing security headers, redirect rules, favicon, and head tags ---');
   writeSecurityFiles(ctx.config.staticOutputDir, ctx.onLog, ctx.config.customRedirects);
-  rebaseWpIncludes(ctx.config.staticOutputDir, ctx.onLog);
   copyFavicon(ctx.config.staticOutputDir, ctx.onLog);
   injectHeadTags(ctx.config.staticOutputDir, ctx.onLog);
   injectPersonSchema(ctx.config.staticOutputDir, ctx.siteTitle, publicUrl, pluginSettings, ctx.onLog);
@@ -227,83 +226,6 @@ function injectPersonSchema(
 }
 
 /**
- * Collects all /wp-includes/ asset references from HTML files, copies only those
- * files to /assets/wp/ (preserving subdirectory structure), rewrites the HTML
- * references, then deletes wp-includes entirely.
- */
-function rebaseWpIncludes(outputDir: string, onLog: (msg: string) => void): void {
-  const wpIncludesDir = path.join(outputDir, 'wp-includes');
-  if (!fs.existsSync(wpIncludesDir)) {
-    onLog('wp-includes not found in output — skipping rebase');
-    return;
-  }
-
-  // Pass 1: collect every /wp-includes/... href or src referenced in HTML
-  const referenced = new Set<string>();
-
-  function collectRefs(dir: string): void {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        collectRefs(fullPath);
-      } else if (entry.name.endsWith('.html')) {
-        const html = fs.readFileSync(fullPath, 'utf-8');
-        for (const match of html.matchAll(/(?:href|src)="(\/wp-includes\/[^"]+)"/g)) {
-          referenced.add(match[1]);
-        }
-      }
-    }
-  }
-
-  collectRefs(outputDir);
-
-  if (referenced.size === 0) {
-    onLog('No wp-includes assets referenced in HTML — removing directory');
-    fs.rmSync(wpIncludesDir, { recursive: true, force: true });
-    return;
-  }
-
-  // Pass 2: copy only referenced files to /assets/wp/
-  let copied = 0;
-  for (const assetPath of referenced) {
-    const src = path.join(outputDir, assetPath);
-    const dest = path.join(outputDir, assetPath.replace('/wp-includes/', '/assets/wp/'));
-    if (fs.existsSync(src)) {
-      fs.mkdirSync(path.dirname(dest), { recursive: true });
-      fs.copyFileSync(src, dest);
-      copied++;
-    }
-  }
-  onLog(`Copied ${copied} wp-includes assets to /assets/wp/`);
-
-  // Pass 3: rewrite /wp-includes/ → /assets/wp/ in all HTML files
-  let rewritten = 0;
-
-  function rewriteRefs(dir: string): void {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        rewriteRefs(fullPath);
-      } else if (entry.name.endsWith('.html')) {
-        const html = fs.readFileSync(fullPath, 'utf-8');
-        const updated = html.replaceAll('/wp-includes/', '/assets/wp/');
-        if (updated !== html) {
-          fs.writeFileSync(fullPath, updated, 'utf-8');
-          rewritten++;
-        }
-      }
-    }
-  }
-
-  rewriteRefs(outputDir);
-  onLog(`Rewrote wp-includes references in ${rewritten} HTML files`);
-
-  // Pass 4: delete wp-includes
-  fs.rmSync(wpIncludesDir, { recursive: true, force: true });
-  onLog('Removed: wp-includes');
-}
-
-/**
  * Writes Cloudflare Pages _headers and _redirects files to harden the static output:
  * - Blocks WordPress-specific paths that leak stack info
  * - Adds security headers (CSP, HSTS, X-Frame-Options, etc.)
@@ -313,6 +235,7 @@ function writeSecurityFiles(outputDir: string, onLog: (msg: string) => void, cus
   // Paths to scrub from the static output entirely
   const pathsToRemove = [
     'wp-json',
+    'wp-includes',
     'feed',
     'comments',
   ];
