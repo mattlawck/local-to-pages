@@ -20,6 +20,11 @@ On each deploy:
 - [Staatic](https://wordpress.org/plugins/staatic/) (free) installed and activated in WordPress
   - In your WordPress admin, go to **Staatic → Settings → Publishing**
   - Set the deployment method to **Local Directory** and note the output path — you'll need it during setup
+- **Local to Pages WordPress plugin** — download `local-to-pages-wordpress-plugin.zip` from the [Releases page](https://github.com/mattlawck/local-to-pages/releases) and install it in WordPress (**Plugins → Add New → Upload Plugin**)
+  - After activation, go to **Settings → Local to Pages** and fill in your identity fields (role, GitHub URL, LinkedIn URL, employer, areas of expertise)
+  - These fields power the `llms.txt` Core Identity section and the Person JSON-LD schema injected into every page
+- [The SEO Framework](https://wordpress.org/plugins/autodescription/) (free) — recommended SEO plugin, compatible with static export
+  - Outputs WebSite and WebPage JSON-LD schemas that complement the Person schema added by the add-on
 - WordPress REST API enabled (on by default)
 
 ### Cloudflare
@@ -95,6 +100,27 @@ These files are generated from your WordPress content and deployed alongside you
 - `yourdomain.com/llms-full.txt` — the full text of every page and post as clean markdown
 
 See [llmstxt.org](https://llmstxt.org) for the specification.
+
+## Person schema
+
+The add-on injects a `schema.org/Person` JSON-LD block into the `<head>` of every HTML file at deploy time — after the static export, so it's guaranteed to be present regardless of SEO plugin configuration.
+
+The schema is built from your **Local to Pages plugin settings** and your site title/URL:
+
+```json
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Your Name",
+  "url": "https://yoursite.com",
+  "jobTitle": "Your Role",
+  "worksFor": { "@type": "Organization", "name": "Employer", "url": "https://employer.com" },
+  "knowsAbout": ["Topic 1", "Topic 2"],
+  "sameAs": ["https://github.com/you", "https://linkedin.com/in/you"]
+}
+```
+
+Fields are only included when set — an empty plugin settings form produces no schema injection.
 
 ## File structure
 
