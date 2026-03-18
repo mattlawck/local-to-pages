@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { WpCliOptions } from './simplystatic';
 import { runStaaticPublish } from './staatic';
-import { fetchAllContent, generateLlmsTxt, generateLlmsFullTxt, generateSitemap } from './llms';
+import { fetchAllContent, fetchPluginSettings, generateLlmsTxt, generateLlmsFullTxt, generateSitemap, LlmsPluginSettings } from './llms';
 import { deployToCloudflarePages } from './cloudflare';
 import { SiteConfig } from '../shared/types';
 
@@ -58,6 +58,7 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
 
   const publicUrl = ctx.config.publicUrl || `https://${ctx.config.cfProjectName}.pages.dev`;
   const content = await fetchAllContent(ctx.siteUrl, ctx.onLog);
+  const pluginSettings = await fetchPluginSettings(ctx.siteUrl);
   const llmsOpts = {
     publicUrl,
     siteUrl: ctx.siteUrl,
@@ -66,6 +67,7 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
     outputDir: ctx.config.staticOutputDir,
     onLog: ctx.onLog,
     content,
+    pluginSettings,
   };
 
   await generateSitemap({ publicUrl, outputDir: ctx.config.staticOutputDir, onLog: ctx.onLog, content });
@@ -78,6 +80,7 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
   writeSecurityFiles(ctx.config.staticOutputDir, ctx.onLog, ctx.config.customRedirects);
   copyFavicon(ctx.config.staticOutputDir, ctx.onLog);
   injectHeadTags(ctx.config.staticOutputDir, ctx.onLog);
+  injectPersonSchema(ctx.config.staticOutputDir, ctx.siteTitle, publicUrl, pluginSettings, ctx.onLog);
 
   // Step 3: Deploy to Cloudflare Pages
   ctx.onStep('deploying');
@@ -148,7 +151,7 @@ function injectHeadTags(outputDir: string, onLog: (msg: string) => void): void {
         const html = fs.readFileSync(fullPath, 'utf-8');
         // Skip if already injected
         if (html.includes('favicon.svg')) continue;
-        const updated = html.replace('</head>', `  ${tags}\n</head>`);
+        const updated = html.replaceAll('</head>', `  ${tags}\n</head>`);
         if (updated !== html) {
           fs.writeFileSync(fullPath, updated, 'utf-8');
           count++;
@@ -159,6 +162,59 @@ function injectHeadTags(outputDir: string, onLog: (msg: string) => void): void {
 
   processDir(outputDir);
   onLog(`Injected favicon tags into ${count} HTML files`);
+}
+
+/**
+ * Injects a Person JSON-LD schema block into the <head> of every HTML file.
+ * Only runs if at least one identity field is present in plugin settings.
+ */
+function injectPersonSchema(
+  outputDir: string,
+  siteTitle: string,
+  publicUrl: string,
+  settings: LlmsPluginSettings,
+  onLog: (msg: string) => void,
+): void {
+  const sameAs: string[] = [];
+  if (settings.github_url) sameAs.push(settings.github_url);
+  if (settings.linkedin_url) sameAs.push(settings.linkedin_url);
+
+  if (!settings.role && sameAs.length === 0) return;
+
+  const schema: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    'name': siteTitle,
+    'url': publicUrl.replaceAll(/\/$/g, ''),
+  };
+  if (settings.role) schema['jobTitle'] = settings.role;
+  if (sameAs.length > 0) schema['sameAs'] = sameAs;
+
+  // Escape </script> sequences to prevent script tag injection from network-sourced field values
+  const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', '<\\/');
+  const block = `<script type="application/ld+json">\n${safeJson}\n</script>`;
+
+  let count = 0;
+
+  function processDir(dir: string): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        processDir(fullPath);
+      } else if (entry.name.endsWith('.html')) {
+        const html = fs.readFileSync(fullPath, 'utf-8');
+        if (html.includes('application/ld+json')) continue;
+        const updated = html.replaceAll('</head>', `  ${block}\n</head>`);
+        if (updated !== html) {
+          fs.writeFileSync(fullPath, updated, 'utf-8');
+          count++;
+        }
+      }
+    }
+  }
+
+  processDir(outputDir);
+  onLog(`Injected Person schema into ${count} HTML files`);
 }
 
 /**

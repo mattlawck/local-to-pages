@@ -2,7 +2,6 @@ import * as React from 'react';
 import { DeployStep } from '../shared/types';
 
 interface Props {
-  siteId: string;
   step: DeployStep;
   logs: string[];
   pagesUrl?: string;

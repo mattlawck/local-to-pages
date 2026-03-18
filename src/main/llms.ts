@@ -58,7 +58,7 @@ export function escapeXml(str: string): string {
  */
 export function stripHtml(html: string): string {
   return html
-    .replace(/<[^>]{0,2000}>/g, ' ')
+    .replaceAll(/<[^>]{0,2000}>/g, ' ')
     .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
@@ -76,7 +76,7 @@ export async function fetchAllContent(
   siteUrl: string,
   onLog: (msg: string) => void,
 ): Promise<{ pages: WpPage[]; posts: WpPost[] }> {
-  const base = siteUrl.replace(/\/$/, '');
+  const base = siteUrl.replaceAll(/\/$/g, '');
 
   // Get the front page ID so we can exclude it (it's served at / already)
   const siteInfo = await fetchJson<{ page_on_front?: number; show_on_front?: string }>(
@@ -116,7 +116,7 @@ export async function generateSitemap(opts: {
   opts.onLog('Generating sitemap.xml...');
 
   const { pages, posts } = opts.content;
-  const base = opts.publicUrl.replace(/\/$/, '');
+  const base = opts.publicUrl.replaceAll(/\/$/g, '');
 
   const urlEntries = [...pages, ...posts].map((item) => {
     const loc = escapeXml(`${base}/${item.slug}/`);
@@ -154,12 +154,37 @@ export interface LlmsPluginSettings {
  * Returns empty defaults if the plugin is not installed.
  */
 export async function fetchPluginSettings(siteUrl: string): Promise<LlmsPluginSettings> {
-  const base = siteUrl.replace(/\/$/, '');
+  const base = siteUrl.replaceAll(/\/$/g, '');
   try {
     return await fetchJson<LlmsPluginSettings>(`${base}/wp-json/local-to-pages/v1/settings`);
   } catch {
     return { role: '', github_url: '', linkedin_url: '', optional_slugs: [] };
   }
+}
+
+function buildIdentitySection(siteTitle: string, base: string, settings: LlmsPluginSettings): string[] {
+  const hasIdentity = settings.role || settings.github_url || settings.linkedin_url;
+  if (!hasIdentity) return [];
+
+  const lines = ['## Core Identity', '', `- **Name:** ${siteTitle}`];
+  if (settings.role) lines.push(`- **Role:** ${settings.role}`);
+  lines.push(`- **Primary Domain:** ${base}/`);
+  if (settings.github_url) lines.push(`- **GitHub:** ${settings.github_url}`);
+  if (settings.linkedin_url) lines.push(`- **LinkedIn:** ${settings.linkedin_url}`);
+  lines.push('');
+  return lines;
+}
+
+function buildContentSection(heading: string, items: WpPage[], base: string): string[] {
+  if (items.length === 0) return [];
+  const lines = [`## ${heading}`, ''];
+  for (const item of items) {
+    const excerpt = stripHtml(item.excerpt.rendered).slice(0, 120);
+    const url = `${base}/${item.slug}/`;
+    lines.push(`- [${item.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
+  }
+  lines.push('');
+  return lines;
 }
 
 /**
@@ -174,74 +199,32 @@ export async function generateLlmsTxt(opts: {
   outputDir: string;
   onLog: (msg: string) => void;
   content: { pages: WpPage[]; posts: WpPost[] };
+  pluginSettings?: LlmsPluginSettings;
 }): Promise<void> {
   opts.onLog('Generating llms.txt...');
 
   const { pages, posts } = opts.content;
-  const base = opts.publicUrl.replace(/\/$/, '');
-
-  const settings = await fetchPluginSettings(opts.siteUrl);
+  const base = opts.publicUrl.replaceAll(/\/$/g, '');
+  const settings = opts.pluginSettings ?? await fetchPluginSettings(opts.siteUrl);
+  const optionalSlugs = new Set(settings.optional_slugs);
+  const keyPages = pages.filter((p) => !optionalSlugs.has(p.slug));
+  const optionalPages = pages.filter((p) => optionalSlugs.has(p.slug));
 
   const lines: string[] = [
     `# ${opts.siteTitle}`,
     '',
     `> ${opts.siteDescription}`,
     '',
-  ];
-
-  // Core Identity — only rendered if plugin provides any fields
-  const hasIdentity = settings.role || settings.github_url || settings.linkedin_url;
-  if (hasIdentity) {
-    lines.push('## Core Identity', '', `- **Name:** ${opts.siteTitle}`);
-    if (settings.role) lines.push(`- **Role:** ${settings.role}`);
-    lines.push(`- **Primary Domain:** ${base}/`);
-    if (settings.github_url) lines.push(`- **GitHub:** ${settings.github_url}`);
-    if (settings.linkedin_url) lines.push(`- **LinkedIn:** ${settings.linkedin_url}`);
-    lines.push('');
-  }
-
-  // Split pages into Key Resources and Optional
-  const optionalSlugs = new Set(settings.optional_slugs);
-  const keyPages = pages.filter((p) => !optionalSlugs.has(p.slug));
-  const optionalPages = pages.filter((p) => optionalSlugs.has(p.slug));
-
-  if (keyPages.length > 0) {
-    lines.push('## Key Resources', '');
-    for (const page of keyPages) {
-      const excerpt = stripHtml(page.excerpt.rendered).slice(0, 120);
-      const url = `${base}/${page.slug}/`;
-      lines.push(`- [${page.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
-    }
-    lines.push('');
-  }
-
-  if (posts.length > 0) {
-    lines.push('## Posts', '');
-    for (const post of posts) {
-      const excerpt = stripHtml(post.excerpt.rendered).slice(0, 120);
-      const url = `${base}/${post.slug}/`;
-      lines.push(`- [${post.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
-    }
-    lines.push('');
-  }
-
-  if (optionalPages.length > 0) {
-    lines.push('## Optional / Background', '');
-    for (const page of optionalPages) {
-      const excerpt = stripHtml(page.excerpt.rendered).slice(0, 120);
-      const url = `${base}/${page.slug}/`;
-      lines.push(`- [${page.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
-    }
-    lines.push('');
-  }
-
-  lines.push(
+    ...buildIdentitySection(opts.siteTitle, base, settings),
+    ...buildContentSection('Key Resources', keyPages, base),
+    ...buildContentSection('Posts', posts as WpPage[], base),
+    ...buildContentSection('Optional / Background', optionalPages, base),
     '## Technical Documentation for Agents',
     '',
     `- [Full content (llms-full.txt)](${base}/llms-full.txt): Complete text of all pages and posts for AI ingestion`,
     `- [Sitemap](${base}/sitemap.xml): XML sitemap for comprehensive crawling`,
     '',
-  );
+  ];
 
   const llmsTxtPath = path.join(opts.outputDir, 'llms.txt');
   fs.writeFileSync(llmsTxtPath, lines.join('\n'), 'utf-8');
@@ -263,7 +246,7 @@ export async function generateLlmsFullTxt(opts: {
 
   const { pages, posts } = opts.content;
   const td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
-  const base = opts.publicUrl.replace(/\/$/, '');
+  const base = opts.publicUrl.replaceAll(/\/$/g, '');
   const today = new Date().toISOString().split('T')[0];
 
   const sections: string[] = [

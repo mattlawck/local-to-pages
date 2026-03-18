@@ -106,7 +106,6 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
       <div style={styles.content}>
         {tab === 'deploy' ? (
           <DeployPanel
-            siteId={siteId}
             step={deployState.step}
             logs={deployState.logs}
             pagesUrl={deployState.pagesUrl}
