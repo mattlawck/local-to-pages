@@ -146,6 +146,9 @@ export interface LlmsPluginSettings {
   role: string;
   github_url: string;
   linkedin_url: string;
+  employer_name: string;
+  employer_url: string;
+  knows_about: string[];
   optional_slugs: string[];
 }
 
@@ -158,7 +161,7 @@ export async function fetchPluginSettings(siteUrl: string): Promise<LlmsPluginSe
   try {
     return await fetchJson<LlmsPluginSettings>(`${base}/wp-json/local-to-pages/v1/settings`);
   } catch {
-    return { role: '', github_url: '', linkedin_url: '', optional_slugs: [] };
+    return { role: '', github_url: '', linkedin_url: '', employer_name: '', employer_url: '', knows_about: [], optional_slugs: [] };
   }
 }
 
