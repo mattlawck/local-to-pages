@@ -211,7 +211,7 @@ function injectPersonSchema(
         processDir(fullPath);
       } else if (entry.name.endsWith('.html')) {
         const html = fs.readFileSync(fullPath, 'utf-8');
-        if (html.includes('application/ld+json')) continue;
+        if (html.includes('"@type": "Person"')) continue;
         const updated = html.replaceAll('</head>', `  ${block}\n</head>`);
         if (updated !== html) {
           fs.writeFileSync(fullPath, updated, 'utf-8');
