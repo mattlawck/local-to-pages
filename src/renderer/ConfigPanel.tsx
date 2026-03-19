@@ -109,21 +109,25 @@ const Field: React.FC<FieldProps> = ({
   onChange,
   type = 'text',
   placeholder = '',
-}) => (
-  <div style={styles.field}>
-    <label style={styles.label}>{label}</label>
-    <input
-      type={type}
-      value={value}
-      placeholder={placeholder}
-      onChange={(e) => onChange(e.target.value)}
-      style={styles.input}
-      autoComplete="off"
-      spellCheck={false}
-    />
-    <p style={styles.hint}>{hint}</p>
-  </div>
-);
+}) => {
+  const id = label.toLowerCase().replaceAll(/\s+/g, '-');
+  return (
+    <div style={styles.field}>
+      <label style={styles.label} htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        style={styles.input}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <p style={styles.hint}>{hint}</p>
+    </div>
+  );
+};
 
 const styles: Record<string, React.CSSProperties> = {
   form: {

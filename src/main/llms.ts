@@ -239,6 +239,7 @@ export async function generateLlmsTxt(opts: {
  */
 export async function generateLlmsFullTxt(opts: {
   publicUrl: string;
+  siteUrl: string;
   siteTitle: string;
   siteDescription: string;
   outputDir: string;
@@ -250,6 +251,7 @@ export async function generateLlmsFullTxt(opts: {
   const { pages, posts } = opts.content;
   const td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
   const base = opts.publicUrl.replaceAll(/\/$/g, '');
+  const localBase = opts.siteUrl.replaceAll(/\/$/g, '');
   const today = new Date().toISOString().split('T')[0];
 
   const sections: string[] = [
@@ -277,7 +279,8 @@ export async function generateLlmsFullTxt(opts: {
       ...(summary ? [`**Summary:** ${summary}`, ''] : ['']),
     );
 
-    const markdown = td.turndown(item.content.rendered);
+    const html = item.content.rendered.replaceAll(localBase, base);
+    const markdown = td.turndown(html);
     sections.push(markdown, '', '</article>', '');
   }
 
