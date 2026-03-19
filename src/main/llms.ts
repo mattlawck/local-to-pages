@@ -279,7 +279,11 @@ export async function generateLlmsFullTxt(opts: {
       ...(summary ? [`**Summary:** ${summary}`, ''] : ['']),
     );
 
-    const html = item.content.rendered.replaceAll(localBase, base);
+    const localBaseHttp = localBase.replace(/^https?:/, 'http:');
+    const localBaseHttps = localBase.replace(/^https?:/, 'https:');
+    const html = item.content.rendered
+      .replaceAll(localBaseHttp, base)
+      .replaceAll(localBaseHttps, base);
     const markdown = td.turndown(html);
     sections.push(markdown, '', '</article>', '');
   }
