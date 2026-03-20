@@ -165,6 +165,18 @@ function injectHeadTags(outputDir: string, onLog: (msg: string) => void): void {
 }
 
 /**
+ * Returns true if the string is a valid http/https URL.
+ */
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Injects a Person JSON-LD schema block into the <head> of every HTML file.
  * Only runs if at least one identity field is present in plugin settings.
  */
@@ -176,8 +188,8 @@ function injectPersonSchema(
   onLog: (msg: string) => void,
 ): void {
   const sameAs: string[] = [];
-  if (settings.github_url) sameAs.push(settings.github_url);
-  if (settings.linkedin_url) sameAs.push(settings.linkedin_url);
+  if (settings.github_url && isValidHttpUrl(settings.github_url)) sameAs.push(settings.github_url);
+  if (settings.linkedin_url && isValidHttpUrl(settings.linkedin_url)) sameAs.push(settings.linkedin_url);
 
   if (!settings.role && sameAs.length === 0) return;
 
@@ -192,7 +204,7 @@ function injectPersonSchema(
     schema['worksFor'] = {
       '@type': 'Organization',
       'name': settings.employer_name,
-      ...(settings.employer_url ? { 'url': settings.employer_url } : {}),
+      ...(settings.employer_url && isValidHttpUrl(settings.employer_url) ? { 'url': settings.employer_url } : {}),
     };
   }
   if (settings.knows_about.length > 0) schema['knowsAbout'] = settings.knows_about;
