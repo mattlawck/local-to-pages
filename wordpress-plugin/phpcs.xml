@@ -7,6 +7,8 @@
     <rule ref="WordPress">
         <!-- Plugin is single-file; prefix check is overly strict for this scope -->
         <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+        <!-- SonarQube enforces camelCase for function names; WPCS snake_case conflicts -->
+        <exclude name="WordPress.NamingConventions.ValidFunctionName.FunctionNameInvalid"/>
     </rule>
 
     <config name="minimum_supported_wp_version" value="6.0"/>

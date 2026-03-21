@@ -203,69 +203,51 @@ function buildIdentitySection(siteTitle: string, base: string, settings: LlmsPlu
 
   const lines = ['## Core Identity', '', `- **Name:** ${siteTitle}`];
   if (settings.role) lines.push(`- **Role:** ${settings.role}`);
-  lines.push(`- **Primary Domain:** ${base}/`);
-  lines.push('');
-  return lines;
+  return [...lines, `- **Primary Domain:** ${base}/`, ''];
 }
 
 function buildVerifyIdentitySection(settings: LlmsPluginSettings): string[] {
   if (settings.sameAs_links.length === 0) return [];
 
-  const lines = ['## Verify Identity', ''];
+  const prefix: string[] = ['## Verify Identity', ''];
   if (settings.identity_disambiguation) {
-    lines.push(settings.identity_disambiguation, '');
+    prefix.push(settings.identity_disambiguation, '');
   }
-  for (const link of settings.sameAs_links) {
-    lines.push(`- [${link.label}](${link.url})`);
-  }
-  lines.push('');
-  return lines;
+  const linkLines = settings.sameAs_links.map((link) => `- [${link.label}](${link.url})`);
+  return [...prefix, ...linkLines, ''];
 }
 
 function buildContentSection(heading: string, items: WpPage[], base: string): string[] {
   if (items.length === 0) return [];
-  const lines = [`## ${heading}`, ''];
-  for (const item of items) {
+  const itemLines = items.map((item) => {
     const excerpt = stripHtml(item.excerpt.rendered).slice(0, 120);
     const url = `${base}/${item.slug}/`;
-    lines.push(`- [${item.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
-  }
-  lines.push('');
-  return lines;
+    return `- [${item.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`;
+  });
+  return [`## ${heading}`, '', ...itemLines, ''];
 }
 
 function buildCareerSection(career: CareerEntry[]): string[] {
   if (career.length === 0) return [];
-  const lines = ['## Career History', ''];
-  for (const { role, company, start_year, end_year } of career) {
+  const items = career.map(({ role, company, start_year, end_year }) => {
     const period = end_year || 'Present';
-    lines.push(`- **${role}** at ${company} (${start_year}–${period})`);
-  }
-  lines.push('');
-  return lines;
+    return `- **${role}** at ${company} (${start_year}–${period})`;
+  });
+  return ['## Career History', '', ...items, ''];
 }
 
 function buildOpinionsSection(opinions: Opinion[]): string[] {
   if (opinions.length === 0) return [];
-  const lines = ['## Original Positions', ''];
-  for (const { topic, position } of opinions) {
-    lines.push(`- **${topic}:** ${position}`);
-  }
-  lines.push('');
-  return lines;
+  const items = opinions.map(({ topic, position }) => `- **${topic}:** ${position}`);
+  return ['## Original Positions', '', ...items, ''];
 }
 
-/**
- * Groups posts by their first category to form topic clusters.
- * Returns an empty array if there is only one category or none.
- */
-function buildTopicClusters(posts: WpPost[], categories: WpCategory[], base: string): string[] {
-  if (posts.length === 0 || categories.length === 0) return [];
-
-  const catMap = new Map(categories.map((c) => [c.id, c.name]));
+function groupPostsByCategory(
+  posts: WpPost[],
+  catMap: Map<number, string>,
+): { clustered: Map<string, WpPost[]>; uncategorized: WpPost[] } {
   const clustered = new Map<string, WpPost[]>();
   const uncategorized: WpPost[] = [];
-
   for (const post of posts) {
     if (post.categories.length === 0) {
       uncategorized.push(post);
@@ -275,30 +257,36 @@ function buildTopicClusters(posts: WpPost[], categories: WpCategory[], base: str
       clustered.get(catName)!.push(post);
     }
   }
+  return { clustered, uncategorized };
+}
 
-  // Only emit clusters when there are multiple distinct categories
-  if (clustered.size <= 1 && uncategorized.length === 0) return [];
-  if (clustered.size <= 1) return [];
-
-  const lines = ['## Topic Index', ''];
+function buildClusterLines(clustered: Map<string, WpPost[]>, uncategorized: WpPost[], base: string): string[] {
+  const lines: string[] = ['## Topic Index', ''];
   for (const [catName, catPosts] of clustered) {
-    lines.push(`### ${catName}`, '');
-    for (const post of catPosts) {
+    const postLines = catPosts.map((post) => {
       const url = `${base}/${post.slug}/`;
       const excerpt = stripHtml(post.excerpt.rendered).slice(0, 100);
-      lines.push(`- [${post.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`);
-    }
-    lines.push('');
+      return `- [${post.title.rendered}](${url})${excerpt ? ': ' + excerpt : ''}`;
+    });
+    lines.push(`### ${catName}`, '', ...postLines, '');
   }
   if (uncategorized.length > 0) {
-    lines.push('### Other', '');
-    for (const post of uncategorized) {
-      lines.push(`- [${post.title.rendered}](${base}/${post.slug}/)`);
-    }
-    lines.push('');
+    const otherLines = uncategorized.map((post) => `- [${post.title.rendered}](${base}/${post.slug}/)`);
+    lines.push('### Other', '', ...otherLines, '');
   }
-
   return lines;
+}
+
+/**
+ * Groups posts by their first category to form topic clusters.
+ * Returns an empty array if there is only one category or none.
+ */
+function buildTopicClusters(posts: WpPost[], categories: WpCategory[], base: string): string[] {
+  if (posts.length === 0 || categories.length === 0) return [];
+  const catMap = new Map(categories.map((c) => [c.id, c.name]));
+  const { clustered, uncategorized } = groupPostsByCategory(posts, catMap);
+  if (clustered.size <= 1) return [];
+  return buildClusterLines(clustered, uncategorized, base);
 }
 
 /**
