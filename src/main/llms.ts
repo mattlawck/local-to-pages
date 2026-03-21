@@ -66,10 +66,10 @@ export function escapeXml(str: string): string {
 export function stripHtml(html: string): string {
   return html
     .replaceAll(/<[^>]{0,2000}>/g, ' ')
+    .replaceAll(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(parseInt(code, 10)))
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
-    .replaceAll('&#039;', "'")
     .replaceAll('&nbsp;', ' ')
     .replaceAll('&amp;', '&')
     .replaceAll(/\s+/g, ' ')
@@ -312,6 +312,11 @@ export async function generateLlmsTxt(opts: {
   const keyPages = pages.filter((p) => !optionalSlugs.has(p.slug));
   const optionalPages = pages.filter((p) => optionalSlugs.has(p.slug));
 
+  const topicClusters = buildTopicClusters(posts, categories, base);
+  const postSection = topicClusters.length > 0
+    ? topicClusters
+    : buildContentSection('Posts', posts as WpPage[], base);
+
   const lines: string[] = [
     `# ${opts.siteTitle}`,
     '',
@@ -319,8 +324,7 @@ export async function generateLlmsTxt(opts: {
     '',
     ...buildIdentitySection(opts.siteTitle, base, settings),
     ...buildContentSection('Key Resources', keyPages, base),
-    ...buildTopicClusters(posts, categories, base),
-    ...buildContentSection('Posts', posts as WpPage[], base),
+    ...postSection,
     ...buildContentSection('Optional / Background', optionalPages, base),
     ...buildOpinionsSection(settings.opinions),
     ...buildVerifyIdentitySection(settings),
