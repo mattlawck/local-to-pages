@@ -178,6 +178,22 @@ function isValidHttpUrl(url: string): boolean {
 }
 
 /**
+ * Strips characters outside the printable ASCII range and limits length.
+ * Used to sanitize network-sourced label strings before writing to disk.
+ */
+function sanitizeLabel(s: string): string {
+  return s.replaceAll(/[^\x20-\x7E]/g, '').trim().slice(0, 300);
+}
+
+/**
+ * Validates a year string: accepts a 4-digit year or "Present".
+ * Returns an empty string for anything else.
+ */
+function sanitizeYear(s: string): string {
+  return /^\d{4}$/.test(s) || s === 'Present' ? s : '';
+}
+
+/**
  * Injects a Person JSON-LD schema block into the <head> of every HTML file.
  * Only runs if at least one identity field is present in plugin settings.
  */
@@ -200,26 +216,27 @@ function injectPersonSchema(
     'name': siteTitle,
     'url': publicUrl.replaceAll(/\/$/g, ''),
   };
-  if (settings.role) schema['jobTitle'] = settings.role;
+  if (settings.role) schema['jobTitle'] = sanitizeLabel(settings.role);
   if (settings.employer_name) {
     schema['worksFor'] = {
       '@type': 'Organization',
-      'name': settings.employer_name,
+      'name': sanitizeLabel(settings.employer_name),
       ...(settings.employer_url && isValidHttpUrl(settings.employer_url) ? { 'url': settings.employer_url } : {}),
     };
   }
-  if (settings.knows_about.length > 0) schema['knowsAbout'] = settings.knows_about;
+  if (settings.knows_about.length > 0) schema['knowsAbout'] = settings.knows_about.map(sanitizeLabel);
   if (sameAs.length > 0) schema['sameAs'] = sameAs;
   if (settings.career_history.length > 0) {
     schema['hasOccupation'] = settings.career_history.map((entry) => {
+      const endYear = sanitizeYear(entry.end_year);
       const occ: Record<string, unknown> = {
         '@type': 'Role',
-        'roleName': entry.role,
+        'roleName': sanitizeLabel(entry.role),
         'startDate': String(entry.start_year),
-        'worksFor': { '@type': 'Organization', 'name': entry.company },
+        'worksFor': { '@type': 'Organization', 'name': sanitizeLabel(entry.company) },
       };
-      if (entry.end_year && entry.end_year !== 'Present') {
-        occ['endDate'] = entry.end_year;
+      if (endYear && endYear !== 'Present') {
+        occ['endDate'] = endYear;
       }
       return occ;
     });
