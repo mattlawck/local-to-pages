@@ -25,7 +25,7 @@ add_action(
 			'Local to Pages',
 			'manage_options',
 			'local-to-pages',
-			'ltp_settings_page'
+			'ltpSettingsPage'
 		);
 	}
 );
@@ -37,7 +37,7 @@ add_action(
 			'ltp_settings',
 			'ltp_options',
 			array(
-				'sanitize_callback' => 'ltp_sanitize',
+				'sanitize_callback' => 'ltpSanitize',
 			)
 		);
 
@@ -82,7 +82,7 @@ add_action(
 		add_settings_field(
 			'ltp_sameAs_links',
 			'Identity Links (sameAs)',
-			'ltp_render_same_as_links',
+			'ltpRenderSameAsLinks',
 			'local-to-pages',
 			'ltp_identity'
 		);
@@ -93,7 +93,7 @@ add_action(
 		add_settings_field(
 			'ltp_career_history',
 			'Roles',
-			'ltp_render_career_history',
+			'ltpRenderCareerHistory',
 			'local-to-pages',
 			'ltp_career'
 		);
@@ -104,7 +104,7 @@ add_action(
 		add_settings_field(
 			'ltp_opinions',
 			'Positions',
-			'ltp_render_opinions',
+			'ltpRenderOpinions',
 			'local-to-pages',
 			'ltp_opinions_section'
 		);
@@ -119,7 +119,7 @@ add_action(
  * Output the shared JS helper for dynamic add/remove tables.
  * Called once per page load; subsequent calls are no-ops.
  */
-function ltp_maybe_print_dynamic_table_js() {
+function ltpMaybePrintDynamicTableJs() {
 	static $printed = false;
 	if ( $printed ) {
 		return;
@@ -165,8 +165,8 @@ function ltp_maybe_print_dynamic_table_js() {
 /**
  * Render the dynamic sameAs links field.
  */
-function ltp_render_same_as_links() {
-	ltp_maybe_print_dynamic_table_js();
+function ltpRenderSameAsLinks() {
+	ltpMaybePrintDynamicTableJs();
 	$options = get_option( 'ltp_options', array() );
 	$links   = isset( $options['sameAs_links'] ) && is_array( $options['sameAs_links'] ) ? $options['sameAs_links'] : array();
 	?>
@@ -197,8 +197,8 @@ function ltp_render_same_as_links() {
 /**
  * Render the dynamic career history field.
  */
-function ltp_render_career_history() {
-	ltp_maybe_print_dynamic_table_js();
+function ltpRenderCareerHistory() {
+	ltpMaybePrintDynamicTableJs();
 	$options = get_option( 'ltp_options', array() );
 	$entries = isset( $options['career_history'] ) && is_array( $options['career_history'] ) ? $options['career_history'] : array();
 	?>
@@ -233,8 +233,8 @@ function ltp_render_career_history() {
 /**
  * Render the dynamic opinions field.
  */
-function ltp_render_opinions() {
-	ltp_maybe_print_dynamic_table_js();
+function ltpRenderOpinions() {
+	ltpMaybePrintDynamicTableJs();
 	$options  = get_option( 'ltp_options', array() );
 	$opinions = isset( $options['opinions'] ) && is_array( $options['opinions'] ) ? $options['opinions'] : array();
 	?>
@@ -267,12 +267,88 @@ function ltp_render_opinions() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Sanitize the sameAs_links array from form input.
+ *
+ * @param mixed $raw Raw input value.
+ * @return array Sanitized sameAs links.
+ */
+function ltpSanitizeSameAsLinks( $raw ) {
+	$clean = array();
+	if ( ! is_array( $raw ) ) {
+		return $clean;
+	}
+	foreach ( $raw as $link ) {
+		$label = sanitize_text_field( isset( $link['label'] ) ? $link['label'] : '' );
+		$url   = esc_url_raw( isset( $link['url'] ) ? $link['url'] : '' );
+		if ( $label && $url ) {
+			$clean[] = array(
+				'label' => $label,
+				'url'   => $url,
+			);
+		}
+	}
+	return $clean;
+}
+
+/**
+ * Sanitize the career_history array from form input.
+ *
+ * @param mixed $raw Raw input value.
+ * @return array Sanitized career history entries.
+ */
+function ltpSanitizeCareerHistory( $raw ) {
+	$clean = array();
+	if ( ! is_array( $raw ) ) {
+		return $clean;
+	}
+	foreach ( $raw as $entry ) {
+		$company    = sanitize_text_field( isset( $entry['company'] ) ? $entry['company'] : '' );
+		$role       = sanitize_text_field( isset( $entry['role'] ) ? $entry['role'] : '' );
+		$start_year = absint( isset( $entry['start_year'] ) ? $entry['start_year'] : 0 );
+		$end_year   = sanitize_text_field( isset( $entry['end_year'] ) ? $entry['end_year'] : '' );
+		if ( $company && $role && $start_year ) {
+			$clean[] = array(
+				'company'    => $company,
+				'role'       => $role,
+				'start_year' => $start_year,
+				'end_year'   => $end_year,
+			);
+		}
+	}
+	return $clean;
+}
+
+/**
+ * Sanitize the opinions array from form input.
+ *
+ * @param mixed $raw Raw input value.
+ * @return array Sanitized opinion entries.
+ */
+function ltpSanitizeOpinions( $raw ) {
+	$clean = array();
+	if ( ! is_array( $raw ) ) {
+		return $clean;
+	}
+	foreach ( $raw as $opinion ) {
+		$topic    = sanitize_text_field( isset( $opinion['topic'] ) ? $opinion['topic'] : '' );
+		$position = sanitize_text_field( isset( $opinion['position'] ) ? $opinion['position'] : '' );
+		if ( $topic && $position ) {
+			$clean[] = array(
+				'topic'    => $topic,
+				'position' => $position,
+			);
+		}
+	}
+	return $clean;
+}
+
+/**
  * Sanitize Local to Pages options input.
  *
  * @param array $input Raw input from the settings form.
  * @return array Sanitized options.
  */
-function ltp_sanitize( $input ) {
+function ltpSanitize( $input ) {
 	$clean = array();
 
 	foreach ( array( 'role', 'employer_name', 'employer_url', 'knows_about', 'optional_slugs' ) as $key ) {
@@ -283,54 +359,9 @@ function ltp_sanitize( $input ) {
 		isset( $input['identity_disambiguation'] ) ? $input['identity_disambiguation'] : ''
 	);
 
-	// sameAs links.
-	$clean['sameAs_links'] = array();
-	if ( isset( $input['sameAs_links'] ) && is_array( $input['sameAs_links'] ) ) {
-		foreach ( $input['sameAs_links'] as $link ) {
-			$label = sanitize_text_field( isset( $link['label'] ) ? $link['label'] : '' );
-			$url   = esc_url_raw( isset( $link['url'] ) ? $link['url'] : '' );
-			if ( $label && $url ) {
-				$clean['sameAs_links'][] = array(
-					'label' => $label,
-					'url'   => $url,
-				);
-			}
-		}
-	}
-
-	// Career history.
-	$clean['career_history'] = array();
-	if ( isset( $input['career_history'] ) && is_array( $input['career_history'] ) ) {
-		foreach ( $input['career_history'] as $entry ) {
-			$company    = sanitize_text_field( isset( $entry['company'] ) ? $entry['company'] : '' );
-			$role       = sanitize_text_field( isset( $entry['role'] ) ? $entry['role'] : '' );
-			$start_year = absint( isset( $entry['start_year'] ) ? $entry['start_year'] : 0 );
-			$end_year   = sanitize_text_field( isset( $entry['end_year'] ) ? $entry['end_year'] : '' );
-			if ( $company && $role && $start_year ) {
-				$clean['career_history'][] = array(
-					'company'    => $company,
-					'role'       => $role,
-					'start_year' => $start_year,
-					'end_year'   => $end_year,
-				);
-			}
-		}
-	}
-
-	// Opinions.
-	$clean['opinions'] = array();
-	if ( isset( $input['opinions'] ) && is_array( $input['opinions'] ) ) {
-		foreach ( $input['opinions'] as $opinion ) {
-			$topic    = sanitize_text_field( isset( $opinion['topic'] ) ? $opinion['topic'] : '' );
-			$position = sanitize_text_field( isset( $opinion['position'] ) ? $opinion['position'] : '' );
-			if ( $topic && $position ) {
-				$clean['opinions'][] = array(
-					'topic'    => $topic,
-					'position' => $position,
-				);
-			}
-		}
-	}
+	$clean['sameAs_links']   = ltpSanitizeSameAsLinks( isset( $input['sameAs_links'] ) ? $input['sameAs_links'] : array() );
+	$clean['career_history'] = ltpSanitizeCareerHistory( isset( $input['career_history'] ) ? $input['career_history'] : array() );
+	$clean['opinions']       = ltpSanitizeOpinions( isset( $input['opinions'] ) ? $input['opinions'] : array() );
 
 	return $clean;
 }
@@ -342,7 +373,7 @@ function ltp_sanitize( $input ) {
 /**
  * Render the Local to Pages admin settings page.
  */
-function ltp_settings_page() {
+function ltpSettingsPage() {
 	?>
 	<div class="wrap">
 		<h1>Local to Pages</h1>
