@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { WpCliOptions } from './simplystatic';
 import { runStaaticPublish } from './staatic';
-import { fetchAllContent, fetchPluginSettings, generateLlmsTxt, generateLlmsFullTxt, generateSitemap, LlmsPluginSettings } from './llms';
+import { fetchAllContent, fetchPluginSettings, generateLlmsTxt, generateLlmsFullTxt, generateSitemap, stripHtml, LlmsPluginSettings, WpPost } from './llms';
 import { deployToCloudflarePages } from './cloudflare';
 import { SiteConfig } from '../shared/types';
 
@@ -81,6 +81,7 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
   copyFavicon(ctx.config.staticOutputDir, ctx.onLog);
   injectHeadTags(ctx.config.staticOutputDir, ctx.onLog);
   injectPersonSchema(ctx.config.staticOutputDir, ctx.siteTitle, publicUrl, pluginSettings, ctx.onLog);
+  injectAnswerCapsules(ctx.config.staticOutputDir, content.posts, ctx.onLog);
 
   // Step 3: Deploy to Cloudflare Pages
   ctx.onStep('deploying');
@@ -177,6 +178,22 @@ function isValidHttpUrl(url: string): boolean {
 }
 
 /**
+ * Strips characters outside the printable ASCII range and limits length.
+ * Used to sanitize network-sourced label strings before writing to disk.
+ */
+function sanitizeLabel(s: string): string {
+  return s.replaceAll(/[^\x20-\x7E]/g, '').trim().slice(0, 300);
+}
+
+/**
+ * Validates a year string: accepts a 4-digit year or "Present".
+ * Returns an empty string for anything else.
+ */
+function sanitizeYear(s: string): string {
+  return /^\d{4}$/.test(s) || s === 'Present' ? s : '';
+}
+
+/**
  * Injects a Person JSON-LD schema block into the <head> of every HTML file.
  * Only runs if at least one identity field is present in plugin settings.
  */
@@ -187,9 +204,9 @@ function injectPersonSchema(
   settings: LlmsPluginSettings,
   onLog: (msg: string) => void,
 ): void {
-  const sameAs: string[] = [];
-  if (settings.github_url && isValidHttpUrl(settings.github_url)) sameAs.push(settings.github_url);
-  if (settings.linkedin_url && isValidHttpUrl(settings.linkedin_url)) sameAs.push(settings.linkedin_url);
+  const sameAs: string[] = settings.sameAs_links
+    .map((link) => link.url)
+    .filter(isValidHttpUrl);
 
   if (!settings.role && sameAs.length === 0) return;
 
@@ -199,16 +216,31 @@ function injectPersonSchema(
     'name': siteTitle,
     'url': publicUrl.replaceAll(/\/$/g, ''),
   };
-  if (settings.role) schema['jobTitle'] = settings.role;
+  if (settings.role) schema['jobTitle'] = sanitizeLabel(settings.role);
   if (settings.employer_name) {
     schema['worksFor'] = {
       '@type': 'Organization',
-      'name': settings.employer_name,
+      'name': sanitizeLabel(settings.employer_name),
       ...(settings.employer_url && isValidHttpUrl(settings.employer_url) ? { 'url': settings.employer_url } : {}),
     };
   }
-  if (settings.knows_about.length > 0) schema['knowsAbout'] = settings.knows_about;
+  if (settings.knows_about.length > 0) schema['knowsAbout'] = settings.knows_about.map(sanitizeLabel);
   if (sameAs.length > 0) schema['sameAs'] = sameAs;
+  if (settings.career_history.length > 0) {
+    schema['hasOccupation'] = settings.career_history.map((entry) => {
+      const endYear = sanitizeYear(entry.end_year);
+      const occ: Record<string, unknown> = {
+        '@type': 'Role',
+        'roleName': sanitizeLabel(entry.role),
+        'startDate': String(entry.start_year),
+        'worksFor': { '@type': 'Organization', 'name': sanitizeLabel(entry.company) },
+      };
+      if (endYear && endYear !== 'Present') {
+        occ['endDate'] = endYear;
+      }
+      return occ;
+    });
+  }
 
   // Escape </script> sequences to prevent script tag injection from network-sourced field values
   const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', String.raw`<\/`);
@@ -235,6 +267,30 @@ function injectPersonSchema(
 
   processDir(outputDir);
   onLog(`Injected Person schema into ${count} HTML files`);
+}
+
+/**
+ * Injects a hidden <div class="ai-summary"> containing the post excerpt into each post's
+ * index.html. The div is machine-readable for AI crawlers and RAG pipelines but hidden
+ * from visual rendering via inline style and aria-hidden.
+ */
+function injectAnswerCapsules(outputDir: string, posts: WpPost[], onLog: (msg: string) => void): void {
+  let count = 0;
+  for (const post of posts) {
+    const filePath = path.join(outputDir, post.slug, 'index.html');
+    if (!fs.existsSync(filePath)) continue;
+    const html = fs.readFileSync(filePath, 'utf-8');
+    if (html.includes('class="ai-summary"')) continue;
+    const summary = stripHtml(post.excerpt.rendered).slice(0, 300);
+    if (!summary) continue;
+    const capsule = `<div class="ai-summary" style="display:none" aria-hidden="true">${summary}</div>`;
+    const updated = html.replace(/<body([^>]*)>/, `<body$1>\n${capsule}`);
+    if (updated !== html) {
+      fs.writeFileSync(filePath, updated, 'utf-8');
+      count++;
+    }
+  }
+  onLog(`Injected answer capsules into ${count} post HTML files`);
 }
 
 /**
