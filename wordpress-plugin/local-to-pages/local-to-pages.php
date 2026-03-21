@@ -393,6 +393,43 @@ function ltpSettingsPage() {
 // REST API endpoint — public read, no auth required
 // ---------------------------------------------------------------------------
 
+/**
+ * Build and return the settings response for the REST API endpoint.
+ *
+ * @return WP_REST_Response The settings response.
+ */
+function ltpSettingsResponse() {
+	$options        = get_option( 'ltp_options', array() );
+	$optional_raw   = isset( $options['optional_slugs'] ) ? $options['optional_slugs'] : '';
+	$optional_slugs = array_values(
+		array_filter( array_map( 'trim', explode( ',', $optional_raw ) ) )
+	);
+	$knows_raw      = isset( $options['knows_about'] ) ? $options['knows_about'] : '';
+	$knows_about    = array_values(
+		array_filter( array_map( 'trim', explode( ',', $knows_raw ) ) )
+	);
+	$same_as_links  = isset( $options['sameAs_links'] ) && is_array( $options['sameAs_links'] )
+		? array_values( $options['sameAs_links'] ) : array();
+	$career_history = isset( $options['career_history'] ) && is_array( $options['career_history'] )
+		? array_values( $options['career_history'] ) : array();
+	$opinions       = isset( $options['opinions'] ) && is_array( $options['opinions'] )
+		? array_values( $options['opinions'] ) : array();
+
+	return rest_ensure_response(
+		array(
+			'role'                    => isset( $options['role'] ) ? $options['role'] : '',
+			'employer_name'           => isset( $options['employer_name'] ) ? $options['employer_name'] : '',
+			'employer_url'            => isset( $options['employer_url'] ) ? $options['employer_url'] : '',
+			'knows_about'             => $knows_about,
+			'optional_slugs'          => $optional_slugs,
+			'sameAs_links'            => $same_as_links,
+			'identity_disambiguation' => isset( $options['identity_disambiguation'] ) ? $options['identity_disambiguation'] : '',
+			'career_history'          => $career_history,
+			'opinions'                => $opinions,
+		)
+	);
+}
+
 add_action(
 	'rest_api_init',
 	function () {
@@ -401,44 +438,7 @@ add_action(
 			'/settings',
 			array(
 				'methods'             => 'GET',
-				'callback'            => function () {
-					$options        = get_option( 'ltp_options', array() );
-					$optional_raw   = isset( $options['optional_slugs'] ) ? $options['optional_slugs'] : '';
-					$optional_slugs = array_values(
-						array_filter(
-							array_map( 'trim', explode( ',', $optional_raw ) )
-						)
-					);
-					$knows_raw   = isset( $options['knows_about'] ) ? $options['knows_about'] : '';
-					$knows_about = array_values(
-						array_filter(
-							array_map( 'trim', explode( ',', $knows_raw ) )
-						)
-					);
-					$same_as_links   = isset( $options['sameAs_links'] ) && is_array( $options['sameAs_links'] )
-						? array_values( $options['sameAs_links'] )
-						: array();
-					$career_history  = isset( $options['career_history'] ) && is_array( $options['career_history'] )
-						? array_values( $options['career_history'] )
-						: array();
-					$opinions        = isset( $options['opinions'] ) && is_array( $options['opinions'] )
-						? array_values( $options['opinions'] )
-						: array();
-
-					return rest_ensure_response(
-						array(
-							'role'                    => isset( $options['role'] ) ? $options['role'] : '',
-							'employer_name'           => isset( $options['employer_name'] ) ? $options['employer_name'] : '',
-							'employer_url'            => isset( $options['employer_url'] ) ? $options['employer_url'] : '',
-							'knows_about'             => $knows_about,
-							'optional_slugs'          => $optional_slugs,
-							'sameAs_links'            => $same_as_links,
-							'identity_disambiguation' => isset( $options['identity_disambiguation'] ) ? $options['identity_disambiguation'] : '',
-							'career_history'          => $career_history,
-							'opinions'                => $opinions,
-						)
-					);
-				},
+				'callback'            => 'ltpSettingsResponse',
 				'permission_callback' => '__return_true',
 			)
 		);
