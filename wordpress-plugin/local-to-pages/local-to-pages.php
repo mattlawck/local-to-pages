@@ -394,38 +394,60 @@ function ltpSettingsPage() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Return a scalar option value, defaulting to an empty string.
+ *
+ * @param array  $options Stored options array.
+ * @param string $key     Option key.
+ * @return string The option value or empty string.
+ */
+function ltpGetOption( $options, $key ) {
+	return isset( $options[ $key ] ) ? $options[ $key ] : '';
+}
+
+/**
+ * Return an option that must be an array, defaulting to an empty array.
+ *
+ * @param array  $options Stored options array.
+ * @param string $key     Option key.
+ * @return array The option value or empty array.
+ */
+function ltpGetArrayOption( $options, $key ) {
+	return isset( $options[ $key ] ) && is_array( $options[ $key ] )
+		? array_values( $options[ $key ] ) : array();
+}
+
+/**
+ * Split a comma-separated option string into a trimmed, filtered array.
+ *
+ * @param array  $options Stored options array.
+ * @param string $key     Option key.
+ * @return array Parsed values.
+ */
+function ltpGetCsvOption( $options, $key ) {
+	return array_values(
+		array_filter( array_map( 'trim', explode( ',', ltpGetOption( $options, $key ) ) ) )
+	);
+}
+
+/**
  * Build and return the settings response for the REST API endpoint.
  *
  * @return WP_REST_Response The settings response.
  */
 function ltpSettingsResponse() {
-	$options        = get_option( 'ltp_options', array() );
-	$optional_raw   = isset( $options['optional_slugs'] ) ? $options['optional_slugs'] : '';
-	$optional_slugs = array_values(
-		array_filter( array_map( 'trim', explode( ',', $optional_raw ) ) )
-	);
-	$knows_raw      = isset( $options['knows_about'] ) ? $options['knows_about'] : '';
-	$knows_about    = array_values(
-		array_filter( array_map( 'trim', explode( ',', $knows_raw ) ) )
-	);
-	$same_as_links  = isset( $options['sameAs_links'] ) && is_array( $options['sameAs_links'] )
-		? array_values( $options['sameAs_links'] ) : array();
-	$career_history = isset( $options['career_history'] ) && is_array( $options['career_history'] )
-		? array_values( $options['career_history'] ) : array();
-	$opinions       = isset( $options['opinions'] ) && is_array( $options['opinions'] )
-		? array_values( $options['opinions'] ) : array();
+	$options = get_option( 'ltp_options', array() );
 
 	return rest_ensure_response(
 		array(
-			'role'                    => isset( $options['role'] ) ? $options['role'] : '',
-			'employer_name'           => isset( $options['employer_name'] ) ? $options['employer_name'] : '',
-			'employer_url'            => isset( $options['employer_url'] ) ? $options['employer_url'] : '',
-			'knows_about'             => $knows_about,
-			'optional_slugs'          => $optional_slugs,
-			'sameAs_links'            => $same_as_links,
-			'identity_disambiguation' => isset( $options['identity_disambiguation'] ) ? $options['identity_disambiguation'] : '',
-			'career_history'          => $career_history,
-			'opinions'                => $opinions,
+			'role'                    => ltpGetOption( $options, 'role' ),
+			'employer_name'           => ltpGetOption( $options, 'employer_name' ),
+			'employer_url'            => ltpGetOption( $options, 'employer_url' ),
+			'knows_about'             => ltpGetCsvOption( $options, 'knows_about' ),
+			'optional_slugs'          => ltpGetCsvOption( $options, 'optional_slugs' ),
+			'sameAs_links'            => ltpGetArrayOption( $options, 'sameAs_links' ),
+			'identity_disambiguation' => ltpGetOption( $options, 'identity_disambiguation' ),
+			'career_history'          => ltpGetArrayOption( $options, 'career_history' ),
+			'opinions'                => ltpGetArrayOption( $options, 'opinions' ),
 		)
 	);
 }
