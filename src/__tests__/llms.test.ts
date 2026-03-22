@@ -65,4 +65,16 @@ describe('stripHtml', () => {
   it('returns an empty string for empty input', () => {
     expect(stripHtml('')).toBe('');
   });
+
+  it('decodes numeric entities like &#8217; (WordPress smart apostrophe)', () => {
+    expect(stripHtml('it&#8217;s')).toBe("it\u2019s");
+  });
+
+  it('decodes &#8220; and &#8221; (WordPress smart double quotes)', () => {
+    expect(stripHtml('&#8220;hello&#8221;')).toBe('\u201chello\u201d');
+  });
+
+  it('decodes &#039; (legacy numeric single quote)', () => {
+    expect(stripHtml('it&#039;s')).toBe("it's");
+  });
 });
