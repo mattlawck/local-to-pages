@@ -41,16 +41,16 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/turndown": "^5.0.4",
     "css-loader": "^7.1.4",
-    "eslint": "^10.0.3",
+    "eslint": "^10.1.0",
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.4.0",
     "style-loader": "^4.0.0",
     "ts-loader": "^9.5.4",
     "typescript": "^5.0.0",
-    "vitest": "^4.1.0",
+    "vitest": "^4.1.1",
     "webpack": "^5.105.4",
-    "webpack-cli": "^7.0.1"
+    "webpack-cli": "^7.0.2"
   },
   "peerDependencies": {
     "electron": "*",
