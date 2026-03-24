@@ -4,6 +4,16 @@ import * as https from 'node:https';
 import * as http from 'node:http';
 import TurndownService from 'turndown';
 
+/** Returns YYYY-MM-DD in the given IANA timezone (e.g. "America/New_York"). */
+function localDateString(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 export interface WpPage {
   id: number;
   slug: string;
@@ -82,14 +92,15 @@ export function stripHtml(html: string): string {
 export async function fetchAllContent(
   siteUrl: string,
   onLog: (msg: string) => void,
-): Promise<{ pages: WpPage[]; posts: WpPost[]; categories: WpCategory[] }> {
+): Promise<{ pages: WpPage[]; posts: WpPost[]; categories: WpCategory[]; timezone: string }> {
   const base = siteUrl.replaceAll(/\/$/g, '');
 
-  // Get the front page ID so we can exclude it (it's served at / already)
-  const siteInfo = await fetchJson<{ page_on_front?: number; show_on_front?: string }>(
+  // Get site info: front page ID + WordPress timezone setting
+  const siteInfo = await fetchJson<{ page_on_front?: number; show_on_front?: string; timezone_string?: string }>(
     `${base}/wp-json/`,
   );
   const frontPageId = siteInfo.show_on_front === 'page' ? siteInfo.page_on_front : null;
+  const timezone = siteInfo.timezone_string || 'UTC';
 
   onLog('Fetching published pages from WordPress REST API...');
   const pages = await fetchJson<WpPage[]>(
@@ -113,7 +124,7 @@ export async function fetchAllContent(
   );
   onLog(`Found ${categories.length} categories.`);
 
-  return { pages: filteredPages, posts, categories };
+  return { pages: filteredPages, posts, categories, timezone };
 }
 
 /**
@@ -125,23 +136,25 @@ export async function generateSitemap(opts: {
   outputDir: string;
   onLog: (msg: string) => void;
   content: { pages: WpPage[]; posts: WpPost[] };
+  timezone: string;
 }): Promise<void> {
   opts.onLog('Generating sitemap.xml...');
 
   const { pages, posts } = opts.content;
   const base = opts.publicUrl.replaceAll(/\/$/g, '');
+  const tz = opts.timezone;
 
   const urlEntries = [...pages, ...posts].map((item) => {
     const loc = escapeXml(`${base}/${item.slug}/`);
     const lastmod = 'date' in item && typeof item.date === 'string'
-      ? new Date(item.date).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0];
+      ? localDateString(new Date(item.date), tz)
+      : localDateString(new Date(), tz);
     return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`;
   });
 
   // Always include the homepage
   const homepageLoc = escapeXml(base + '/');
-  const homepageDate = new Date().toISOString().split('T')[0];
+  const homepageDate = localDateString(new Date(), tz);
   urlEntries.unshift(`  <url>\n    <loc>${homepageLoc}</loc>\n    <lastmod>${homepageDate}</lastmod>\n  </url>`);
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries.join('\n')}\n</urlset>\n`;
@@ -352,6 +365,7 @@ export async function generateLlmsFullTxt(opts: {
   onLog: (msg: string) => void;
   content: { pages: WpPage[]; posts: WpPost[]; categories: WpCategory[] };
   pluginSettings?: LlmsPluginSettings;
+  timezone: string;
 }): Promise<void> {
   opts.onLog('Generating llms-full.txt...');
 
@@ -360,7 +374,8 @@ export async function generateLlmsFullTxt(opts: {
   const td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
   const base = opts.publicUrl.replaceAll(/\/$/g, '');
   const localBase = opts.siteUrl.replaceAll(/\/$/g, '');
-  const today = new Date().toISOString().split('T')[0];
+  const tz = opts.timezone;
+  const today = localDateString(new Date(), tz);
 
   const sections: string[] = [
     `# ${opts.siteTitle} - Full Content Repository`,
@@ -378,7 +393,7 @@ export async function generateLlmsFullTxt(opts: {
   for (const item of allContent) {
     const url = `${base}/${item.slug}/`;
     const date = 'date' in item
-      ? new Date(item.date).toISOString().split('T')[0]
+      ? localDateString(new Date(item.date), tz)
       : today;
     const summary = stripHtml(item.excerpt.rendered).slice(0, 200);
 
