@@ -9,13 +9,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "outDir": "./dist",
-    "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@main/*": ["src/main/*"],
-      "@renderer/*": ["src/renderer/*"],
-      "@shared/*": ["src/shared/*"]
-    }
+    "rootDir": "./src"
   },
   "include": ["src/**/*", "src/typings/**/*"],
   "exclude": ["node_modules", "dist"]
