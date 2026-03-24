@@ -279,10 +279,14 @@ function injectAnswerCapsules(outputDir: string, posts: WpPost[], onLog: (msg: s
   let count = 0;
   for (const post of posts) {
     const filePath = path.join(outputDir, post.slug, 'index.html');
-    if (!fs.existsSync(filePath)) continue;
-    const html = fs.readFileSync(filePath, 'utf-8');
+    let html: string;
+    try {
+      html = fs.readFileSync(filePath, 'utf-8');
+    } catch {
+      continue;
+    }
     if (html.includes('class="ai-summary"')) continue;
-    const summary = stripHtml(post.excerpt.rendered).slice(0, 300);
+    const summary = sanitizeLabel(stripHtml(post.excerpt.rendered).slice(0, 300));
     if (!summary) continue;
     const capsule = `<div class="ai-summary" style="display:none" aria-hidden="true">${summary}</div>`;
     const updated = html.replace(/<body([^>]*)>/, `<body$1>\n${capsule}`);
