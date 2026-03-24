@@ -1,7 +1,7 @@
 {
   "id": "local-to-pages",
   "name": "Local to Cloudflare Pages",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Deploy your WordPress site as a static site to Cloudflare Pages with llms.txt generation.",
   "author": "Matt Lawrence",
   "homepage": "https://github.com/mattlawck/local-to-pages",

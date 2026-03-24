@@ -68,9 +68,10 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
     onLog: ctx.onLog,
     content,
     pluginSettings,
+    timezone: content.timezone,
   };
 
-  await generateSitemap({ publicUrl, outputDir: ctx.config.staticOutputDir, onLog: ctx.onLog, content });
+  await generateSitemap({ publicUrl, outputDir: ctx.config.staticOutputDir, onLog: ctx.onLog, content, timezone: content.timezone });
   await generateLlmsTxt(llmsOpts);
   await generateLlmsFullTxt(llmsOpts);
 
