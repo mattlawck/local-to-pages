@@ -61,8 +61,8 @@ jobs:
             -f tag_name="${{ github.ref_name }}" \
             -f previous_tag_name="${{ steps.prev_tag.outputs.tag }}" \
             --jq '.body')
-          # Strip version bump PR lines (e.g. "* 0.1.21 by @..." or "* chore/bump...")
-          FILTERED=$(echo "$NOTES" | grep -vE '^\* [0-9]+\.[0-9]+\.[0-9]+|^\* chore.?bump')
+          # Strip version bump and dependency update PR lines
+          FILTERED=$(echo "$NOTES" | grep -vE '^\* [0-9]+\.[0-9]+\.[0-9]+|^\* [Bb]ump|^\* chore.?bump|^\* chore\(deps')
           echo "body<<EOF" >> "$GITHUB_OUTPUT"
           echo "$FILTERED" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
