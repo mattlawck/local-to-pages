@@ -218,6 +218,7 @@ export interface LlmsPluginSettings {
   identity_disambiguation: string;
   career_history: CareerEntry[];
   opinions: Opinion[];
+  page_404_slug: string;
 }
 
 /**
@@ -229,7 +230,7 @@ export async function fetchPluginSettings(siteUrl: string): Promise<LlmsPluginSe
   try {
     return await fetchJson<LlmsPluginSettings>(`${base}/wp-json/local-to-pages/v1/settings`);
   } catch {
-    return { role: '', employer_name: '', employer_url: '', knows_about: [], optional_slugs: [], sameAs_links: [], identity_disambiguation: '', career_history: [], opinions: [] };
+    return { role: '', employer_name: '', employer_url: '', knows_about: [], optional_slugs: [], sameAs_links: [], identity_disambiguation: '', career_history: [], opinions: [], page_404_slug: '' };
   }
 }
 
