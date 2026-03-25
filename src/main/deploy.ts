@@ -83,6 +83,7 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
   copyFavicon(ctx.config.staticOutputDir, ctx.onLog);
   injectHeadTags(ctx.config.staticOutputDir, ctx.onLog);
   injectPersonSchema(ctx.config.staticOutputDir, ctx.siteTitle, publicUrl, pluginSettings, ctx.onLog);
+  injectBlogPostingSchema(ctx.config.staticOutputDir, content.posts, ctx.siteTitle, publicUrl, ctx.onLog);
   injectAnswerCapsules(ctx.config.staticOutputDir, content.posts, ctx.onLog);
 
   // Step 3: Deploy to Cloudflare Pages
@@ -269,6 +270,53 @@ function injectPersonSchema(
 
   processDir(outputDir);
   onLog(`Injected Person schema into ${count} HTML files`);
+}
+
+/**
+ * Injects a BlogPosting JSON-LD schema into each post's index.html.
+ * Includes datePublished, dateModified, headline, author, url, and featured image if present.
+ */
+function injectBlogPostingSchema(
+  outputDir: string,
+  posts: WpPost[],
+  siteTitle: string,
+  publicUrl: string,
+  onLog: (msg: string) => void,
+): void {
+  const base = publicUrl.replaceAll(/\/$/g, '');
+  let count = 0;
+  for (const post of posts) {
+    const filePath = path.join(outputDir, post.slug, 'index.html');
+    let html: string;
+    try {
+      html = fs.readFileSync(filePath, 'utf-8');
+    } catch {
+      continue;
+    }
+    if (html.includes('"@type": "BlogPosting"')) continue;
+
+    const schema: Record<string, unknown> = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      'headline': sanitizeLabel(stripHtml(post.title.rendered)),
+      'datePublished': post.date.slice(0, 10),
+      'dateModified': post.modified.slice(0, 10),
+      'url': `${base}/${post.slug}/`,
+      'author': { '@type': 'Person', 'name': siteTitle, 'url': base },
+    };
+    if (post.featured_image_url && isValidHttpUrl(post.featured_image_url)) {
+      schema['image'] = { '@type': 'ImageObject', 'url': post.featured_image_url };
+    }
+
+    const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', String.raw`<\/`);
+    const block = `<script type="application/ld+json">\n${safeJson}\n</script>`;
+    const updated = html.replaceAll('</head>', `  ${block}\n</head>`);
+    if (updated !== html) {
+      fs.writeFileSync(filePath, updated, 'utf-8');
+      count++;
+    }
+  }
+  onLog(`Injected BlogPosting schema into ${count} post HTML files`);
 }
 
 /**
