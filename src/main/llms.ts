@@ -162,8 +162,31 @@ export async function generateSitemap(opts: {
   fs.writeFileSync(path.join(opts.outputDir, 'sitemap.xml'), xml, 'utf-8');
   opts.onLog(`sitemap.xml written with ${urlEntries.length} URLs`);
 
-  // Rewrite robots.txt to reference the clean sitemap and block WP admin paths
-  const robots = `User-agent: *\nDisallow: /wp-admin/\nDisallow: /wp-json/\nDisallow: /author/\n\nSitemap: ${base}/sitemap.xml\n`;
+  // Rewrite robots.txt — static output has no WP paths to block
+  const robots = [
+    'User-agent: *',
+    'Allow: /',
+    '',
+    'User-agent: OAI-SearchBot',
+    'Allow: /',
+    '',
+    'User-agent: PerplexityBot',
+    'Allow: /',
+    '',
+    'User-agent: ClaudeBot',
+    'Allow: /',
+    '',
+    'User-agent: Googlebot',
+    'Allow: /',
+    '',
+    `Sitemap: ${base}/sitemap.xml`,
+    '',
+    '# content signals',
+    '# search: yes',
+    '# ai-input: yes',
+    '# ai-train: no',
+    '',
+  ].join('\n');
   fs.writeFileSync(path.join(opts.outputDir, 'robots.txt'), robots, 'utf-8');
   opts.onLog('robots.txt updated');
 }

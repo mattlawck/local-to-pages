@@ -46,10 +46,17 @@ jobs:
       - name: Pack WordPress plugin
         run: cd wordpress-plugin && zip -r ../local-to-pages-wordpress-plugin.zip local-to-pages/
 
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
+          echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         run: |
           gh release create ${{ github.ref_name }} *.tgz local-to-pages-wordpress-plugin.zip \
             --title "${{ github.ref_name }}" \
-            --generate-notes
+            --generate-notes \
+            --notes-start-tag "${{ steps.prev_tag.outputs.tag }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
