@@ -305,9 +305,10 @@ function injectBlogPostingSchema(
       'author': { '@type': 'Person', 'name': siteTitle, 'url': base },
     };
     if (post.featured_image_url && isValidHttpUrl(post.featured_image_url)) {
-      // Reconstruct URL via URL parser to break the taint chain from network data
+      // Rewrite local WP host to publicUrl, then reconstruct to break the taint chain
       try {
-        const imageUrl = new URL(post.featured_image_url).href;
+        const localPath = new URL(post.featured_image_url).pathname;
+        const imageUrl = new URL(localPath, base).href;
         schema['image'] = { '@type': 'ImageObject', 'url': imageUrl };
       } catch { /* skip invalid URLs */ }
     }
@@ -422,7 +423,8 @@ function writeSecurityFiles(outputDir: string, onLog: (msg: string) => void, cus
     ...(page404Slug ? ['/* /404.html 404'] : []),
   ].join('\n');
   const custom = customRedirects?.trim();
-  const redirects = `${custom ? `${custom}\n` : ''}${wpBlocks}\n`;
+  const customBlock = custom ? `${custom}\n` : '';
+  const redirects = `${customBlock}${wpBlocks}\n`;
   fs.writeFileSync(path.join(outputDir, '_redirects'), redirects);
   onLog('Written: _redirects');
 }
