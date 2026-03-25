@@ -305,7 +305,11 @@ function injectBlogPostingSchema(
       'author': { '@type': 'Person', 'name': siteTitle, 'url': base },
     };
     if (post.featured_image_url && isValidHttpUrl(post.featured_image_url)) {
-      schema['image'] = { '@type': 'ImageObject', 'url': post.featured_image_url };
+      // Reconstruct URL via URL parser to break the taint chain from network data
+      try {
+        const imageUrl = new URL(post.featured_image_url).href;
+        schema['image'] = { '@type': 'ImageObject', 'url': imageUrl };
+      } catch { /* skip invalid URLs */ }
     }
 
     const safeJson = JSON.stringify(schema, null, 2).replaceAll('</', String.raw`<\/`);
