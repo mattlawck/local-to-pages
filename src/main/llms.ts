@@ -78,7 +78,7 @@ export function escapeXml(str: string): string {
 export function stripHtml(html: string): string {
   return html
     .replaceAll(/<[^>]{0,2000}>/g, ' ')
-    .replaceAll(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(parseInt(code, 10)))
+    .replaceAll(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 10)))
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
