@@ -108,6 +108,17 @@ add_action(
 			'local-to-pages',
 			'ltp_opinions_section'
 		);
+
+		// --- Deploy section ---
+		add_settings_section( 'ltp_deploy', 'Deploy Settings', null, 'local-to-pages' );
+
+		add_settings_field(
+			'ltp_page_404_slug',
+			'404 Page',
+			'ltpRender404Page',
+			'local-to-pages',
+			'ltp_deploy'
+		);
 	}
 );
 
@@ -262,6 +273,28 @@ function ltpRenderOpinions() {
 	<?php
 }
 
+/**
+ * Render the 404 page dropdown field.
+ */
+function ltpRender404Page() {
+	$options  = get_option( 'ltp_options', array() );
+	$selected = isset( $options['page_404_slug'] ) ? $options['page_404_slug'] : '';
+	$pages    = get_pages( array( 'post_status' => 'publish' ) );
+	echo '<select name="ltp_options[page_404_slug]" class="regular-text">';
+	echo '<option value="">— None —</option>';
+	foreach ( $pages as $page ) {
+		$slug = $page->post_name;
+		printf(
+			'<option value="%s"%s>%s</option>',
+			esc_attr( $slug ),
+			selected( $selected, $slug, false ),
+			esc_html( $page->post_title )
+		);
+	}
+	echo '</select>';
+	echo '<p class="description">The WordPress page to serve as the static 404 error page. Must be exported by Staatic before deploying.</p>';
+}
+
 // ---------------------------------------------------------------------------
 // Sanitize
 // ---------------------------------------------------------------------------
@@ -362,6 +395,7 @@ function ltpSanitize( $input ) {
 	$clean['sameAs_links']   = ltpSanitizeSameAsLinks( isset( $input['sameAs_links'] ) ? $input['sameAs_links'] : array() );
 	$clean['career_history'] = ltpSanitizeCareerHistory( isset( $input['career_history'] ) ? $input['career_history'] : array() );
 	$clean['opinions']       = ltpSanitizeOpinions( isset( $input['opinions'] ) ? $input['opinions'] : array() );
+	$clean['page_404_slug']  = sanitize_title( isset( $input['page_404_slug'] ) ? $input['page_404_slug'] : '' );
 
 	return $clean;
 }
@@ -448,6 +482,7 @@ function ltpSettingsResponse() {
 			'identity_disambiguation' => ltpGetOption( $options, 'identity_disambiguation' ),
 			'career_history'          => ltpGetArrayOption( $options, 'career_history' ),
 			'opinions'                => ltpGetArrayOption( $options, 'opinions' ),
+			'page_404_slug'           => ltpGetOption( $options, 'page_404_slug' ),
 		)
 	);
 }

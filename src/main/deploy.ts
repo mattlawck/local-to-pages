@@ -78,7 +78,8 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
   // Step 2.5: Harden the static output + copy favicon + inject head tags
   ctx.onStep('hardening');
   ctx.onLog('--- Step 2.5: Writing security headers, redirect rules, favicon, and head tags ---');
-  writeSecurityFiles(ctx.config.staticOutputDir, ctx.onLog, ctx.config.customRedirects);
+  copy404Page(ctx.config.staticOutputDir, pluginSettings.page_404_slug, ctx.onLog);
+  writeSecurityFiles(ctx.config.staticOutputDir, ctx.onLog, ctx.config.customRedirects, pluginSettings.page_404_slug);
   copyFavicon(ctx.config.staticOutputDir, ctx.onLog);
   injectHeadTags(ctx.config.staticOutputDir, ctx.onLog);
   injectPersonSchema(ctx.config.staticOutputDir, ctx.siteTitle, publicUrl, pluginSettings, ctx.onLog);
@@ -299,12 +300,31 @@ function injectAnswerCapsules(outputDir: string, posts: WpPost[], onLog: (msg: s
 }
 
 /**
+ * Copies the designated 404 page from the static output to 404.html in the root.
+ * Cloudflare Pages serves 404.html automatically for unmatched routes.
+ */
+function copy404Page(outputDir: string, slug: string, onLog: (msg: string) => void): void {
+  if (!slug) return;
+  const src = path.join(outputDir, slug, 'index.html');
+  const dest = path.join(outputDir, '404.html');
+  let html: string;
+  try {
+    html = fs.readFileSync(src, 'utf-8');
+  } catch {
+    onLog(`Warning: 404 page slug "${slug}" not found in static output — skipping`);
+    return;
+  }
+  fs.writeFileSync(dest, html, 'utf-8');
+  onLog(`404.html written from /${slug}/`);
+}
+
+/**
  * Writes Cloudflare Pages _headers and _redirects files to harden the static output:
  * - Blocks WordPress-specific paths that leak stack info
  * - Adds security headers (CSP, HSTS, X-Frame-Options, etc.)
  * - Removes sensitive files from the output directory
  */
-function writeSecurityFiles(outputDir: string, onLog: (msg: string) => void, customRedirects?: string): void {
+function writeSecurityFiles(outputDir: string, onLog: (msg: string) => void, customRedirects?: string, page404Slug?: string): void {
   // Paths to scrub from the static output entirely
   const pathsToRemove = [
     'wp-json',
@@ -337,17 +357,20 @@ function writeSecurityFiles(outputDir: string, onLog: (msg: string) => void, cus
   fs.writeFileSync(path.join(outputDir, '_headers'), headers);
   onLog('Written: _headers');
 
-  // Cloudflare Pages _redirects — user custom rules first, then WP security blocks
-  const wpRedirects = `/wp-json/* /404_not_found 404
-/wp-admin/* /404_not_found 404
-/wp-login.php /404_not_found 404
-/xmlrpc.php /404_not_found 404
-/author/* /404_not_found 404
-/feed/* /404_not_found 404
-/comments/* /404_not_found 404
-`;
+  // Cloudflare Pages _redirects — user custom rules first, then WP security blocks, then catch-all
+  const notFound = page404Slug ? '/404.html' : '/404_not_found';
+  const wpBlocks = [
+    `/wp-json/* ${notFound} 404`,
+    `/wp-admin/* ${notFound} 404`,
+    `/wp-login.php ${notFound} 404`,
+    `/xmlrpc.php ${notFound} 404`,
+    `/author/* ${notFound} 404`,
+    `/feed/* ${notFound} 404`,
+    `/comments/* ${notFound} 404`,
+    ...(page404Slug ? ['/* /404.html 404'] : []),
+  ].join('\n');
   const custom = customRedirects?.trim();
-  const redirects = custom ? `${custom}\n${wpRedirects}` : wpRedirects;
+  const redirects = `${custom ? `${custom}\n` : ''}${wpBlocks}\n`;
   fs.writeFileSync(path.join(outputDir, '_redirects'), redirects);
   onLog('Written: _redirects');
 }
