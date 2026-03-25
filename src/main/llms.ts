@@ -26,7 +26,9 @@ export interface WpPage {
 
 export interface WpPost extends WpPage {
   date: string;
+  modified: string;
   categories: number[];
+  featured_image_url?: string;
 }
 
 export interface WpCategory {
@@ -112,9 +114,15 @@ export async function fetchAllContent(
   onLog(`Found ${filteredPages.length} pages (front page excluded).`);
 
   onLog('Fetching published posts from WordPress REST API...');
-  const posts = await fetchJson<WpPost[]>(
-    `${base}/wp-json/wp/v2/posts?per_page=100&status=publish&_fields=id,slug,title,content,excerpt,link,type,date,categories`,
+  const rawPosts = await fetchJson<Array<WpPost & {
+    _embedded?: { 'wp:featuredmedia'?: Array<{ source_url?: string }> };
+  }>>(
+    `${base}/wp-json/wp/v2/posts?per_page=100&status=publish&_embed=wp:featuredmedia&_fields=id,slug,title,content,excerpt,link,type,date,modified,categories,_links,_embedded`,
   );
+  const posts: WpPost[] = rawPosts.map((p) => ({
+    ...p,
+    featured_image_url: p._embedded?.['wp:featuredmedia']?.[0]?.source_url,
+  }));
 
   onLog(`Found ${posts.length} posts.`);
 
