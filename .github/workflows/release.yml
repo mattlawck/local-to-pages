@@ -54,11 +54,25 @@ jobs:
           PREV=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
           echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release notes
+        id: notes
+        run: |
+          NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="${{ github.ref_name }}" \
+            -f previous_tag_name="${{ steps.prev_tag.outputs.tag }}" \
+            --jq '.body')
+          # Strip version bump PR lines (e.g. "* 0.1.21 by @..." or "* chore/bump...")
+          FILTERED=$(echo "$NOTES" | grep -vE '^\* [0-9]+\.[0-9]+\.[0-9]+|^\* chore.?bump')
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$FILTERED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release
         run: |
           gh release create ${{ github.ref_name }} *.tgz local-to-pages-wordpress-plugin.zip \
             --title "${{ github.ref_name }}" \
-            --generate-notes \
-            --notes-start-tag "${{ steps.prev_tag.outputs.tag }}"
+            --notes "${{ steps.notes.outputs.body }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
