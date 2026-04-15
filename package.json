@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "electron-store": "^8.2.0",
-    "turndown": "^7.2.0"
+    "turndown": "^7.2.4"
   },
   "devDependencies": {
     "@getflywheel/local": "^9.2.9",
