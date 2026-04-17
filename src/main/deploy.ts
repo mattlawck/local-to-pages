@@ -7,6 +7,15 @@ import { fetchAllContent, fetchPluginSettings, generateLlmsTxt, generateLlmsFull
 import { deployToCloudflarePages } from './cloudflare';
 import { SiteConfig } from '../shared/types';
 
+/** Resolve a file path within a directory, throwing if it escapes the boundary. */
+function safePath(baseDir: string, ...segments: string[]): string {
+  const resolved = path.resolve(baseDir, ...segments);
+  if (!resolved.startsWith(path.resolve(baseDir) + path.sep) && resolved !== path.resolve(baseDir)) {
+    throw new Error(`Path traversal blocked: ${resolved} is outside ${baseDir}`);
+  }
+  return resolved;
+}
+
 export interface DeployContext {
   siteId: string;
   siteWebRoot: string;
@@ -288,7 +297,7 @@ function injectBlogPostingSchema(
   const base = publicUrl.replaceAll(/\/$/g, '');
   let count = 0;
   for (const post of posts) {
-    const filePath = path.join(outputDir, post.slug, 'index.html');
+    const filePath = safePath(outputDir, post.slug, 'index.html');
     let html: string;
     try {
       html = fs.readFileSync(filePath, 'utf-8');
@@ -319,7 +328,7 @@ function injectBlogPostingSchema(
     const block = `<script type="application/ld+json">\n${safeJson}\n</script>`;
     const updated = html.replaceAll('</head>', `  ${block}\n</head>`);
     if (updated !== html) {
-      fs.writeFileSync(filePath, updated, 'utf-8'); // codeql[js/http-to-file-access] filePath is local, not network-controlled
+      fs.writeFileSync(filePath, updated, 'utf-8');
       count++;
     }
   }
@@ -334,7 +343,7 @@ function injectBlogPostingSchema(
 function injectAnswerCapsules(outputDir: string, posts: WpPost[], onLog: (msg: string) => void): void {
   let count = 0;
   for (const post of posts) {
-    const filePath = path.join(outputDir, post.slug, 'index.html');
+    const filePath = safePath(outputDir, post.slug, 'index.html');
     let html: string;
     try {
       html = fs.readFileSync(filePath, 'utf-8');
@@ -347,7 +356,7 @@ function injectAnswerCapsules(outputDir: string, posts: WpPost[], onLog: (msg: s
     const capsule = `<div class="ai-summary" style="display:none" aria-hidden="true">${summary}</div>`;
     const updated = html.replace(/<body([^>]*)>/, `<body$1>\n${capsule}`);
     if (updated !== html) {
-      fs.writeFileSync(filePath, updated, 'utf-8'); // codeql[js/http-to-file-access] filePath is local, not network-controlled
+      fs.writeFileSync(filePath, updated, 'utf-8');
       count++;
     }
   }
