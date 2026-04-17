@@ -7,6 +7,15 @@ import { fetchAllContent, fetchPluginSettings, generateLlmsTxt, generateLlmsFull
 import { deployToCloudflarePages } from './cloudflare';
 import { SiteConfig } from '../shared/types';
 
+/** Resolve a file path within a directory, throwing if it escapes the boundary. */
+function safePath(baseDir: string, ...segments: string[]): string {
+  const resolved = path.resolve(baseDir, ...segments);
+  if (!resolved.startsWith(path.resolve(baseDir) + path.sep) && resolved !== path.resolve(baseDir)) {
+    throw new Error(`Path traversal blocked: ${resolved} is outside ${baseDir}`);
+  }
+  return resolved;
+}
+
 export interface DeployContext {
   siteId: string;
   siteWebRoot: string;
@@ -71,7 +80,8 @@ export async function runDeployPipeline(ctx: DeployContext): Promise<string> {
     timezone: content.timezone,
   };
 
-  await generateSitemap({ publicUrl, outputDir: ctx.config.staticOutputDir, onLog: ctx.onLog, content, timezone: content.timezone });
+  const sitemapExclude = [pluginSettings.page_404_slug, ...pluginSettings.optional_slugs].filter(Boolean);
+  await generateSitemap({ publicUrl, outputDir: ctx.config.staticOutputDir, onLog: ctx.onLog, content, timezone: content.timezone, excludeSlugs: sitemapExclude });
   await generateLlmsTxt(llmsOpts);
   await generateLlmsFullTxt(llmsOpts);
 
@@ -142,6 +152,7 @@ function injectHeadTags(outputDir: string, onLog: (msg: string) => void): void {
     '<link rel="icon" type="image/x-icon" href="/favicon.ico">',
     '<link rel="icon" type="image/svg+xml" href="/favicon.svg">',
     '<link rel="apple-touch-icon" href="/favicon-180.png">',
+    '<link rel="preload" as="font" type="font/woff2" href="/wp-content/themes/powder/assets/fonts/google-sans/google-sans.woff2" crossorigin>',
   ].join('\n  ');
 
   let count = 0;
@@ -286,7 +297,7 @@ function injectBlogPostingSchema(
   const base = publicUrl.replaceAll(/\/$/g, '');
   let count = 0;
   for (const post of posts) {
-    const filePath = path.join(outputDir, post.slug, 'index.html');
+    const filePath = safePath(outputDir, post.slug, 'index.html');
     let html: string;
     try {
       html = fs.readFileSync(filePath, 'utf-8');
@@ -332,7 +343,7 @@ function injectBlogPostingSchema(
 function injectAnswerCapsules(outputDir: string, posts: WpPost[], onLog: (msg: string) => void): void {
   let count = 0;
   for (const post of posts) {
-    const filePath = path.join(outputDir, post.slug, 'index.html');
+    const filePath = safePath(outputDir, post.slug, 'index.html');
     let html: string;
     try {
       html = fs.readFileSync(filePath, 'utf-8');

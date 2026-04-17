@@ -145,14 +145,17 @@ export async function generateSitemap(opts: {
   onLog: (msg: string) => void;
   content: { pages: WpPage[]; posts: WpPost[] };
   timezone: string;
+  excludeSlugs?: string[];
 }): Promise<void> {
   opts.onLog('Generating sitemap.xml...');
 
+  const exclude = new Set(opts.excludeSlugs ?? []);
   const { pages, posts } = opts.content;
+  const filteredPages = pages.filter((p) => !exclude.has(p.slug));
   const base = opts.publicUrl.replaceAll(/\/$/g, '');
   const tz = opts.timezone;
 
-  const urlEntries = [...pages, ...posts].map((item) => {
+  const urlEntries = [...filteredPages, ...posts].map((item) => {
     const loc = escapeXml(`${base}/${item.slug}/`);
     const lastmod = 'date' in item && typeof item.date === 'string'
       ? localDateString(new Date(item.date), tz)
