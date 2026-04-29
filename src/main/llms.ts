@@ -47,10 +47,14 @@ function fetchJson<T>(url: string): Promise<T> {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
+        // Strip any non-JSON prefix (e.g. PHP warnings echoed before the body).
+        const firstBracket = data.search(/[[{]/);
+        const cleaned = firstBracket === -1 ? data : data.slice(firstBracket);
         try {
-          resolve(JSON.parse(data) as T);
+          resolve(JSON.parse(cleaned) as T);
         } catch {
-          reject(new Error(`Failed to parse JSON from ${url}`));
+          const snippet = data.slice(0, 200).replaceAll(/\s+/g, ' ').trim();
+          reject(new Error(`Failed to parse JSON from ${url} — response began with: ${snippet}`));
         }
       });
     }).on('error', reject);
