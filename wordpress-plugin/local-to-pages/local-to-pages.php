@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Local to Pages
  * Description: Provides site metadata for llms.txt generation via the Local to Pages add-on.
- * Version:     0.1.23
+ * Version:     0.1.24
  * Author:      Matt Lawrence
  * License:     GPL-2.0-or-later
  *
