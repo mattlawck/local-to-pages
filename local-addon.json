@@ -7,7 +7,7 @@
   "homepage": "https://github.com/mattlawck/local-to-pages",
   "main": "dist/main.js",
   "renderer": "dist/renderer.js",
-  "minLocalVersion": "8.0.0",
+  "minLocalVersion": "10.0.0",
   "icon": "icon.png",
   "bgColor": "#51bb7b"
 }
