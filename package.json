@@ -55,7 +55,7 @@
     "webpack-cli": "^7.0.2"
   },
   "peerDependencies": {
-    "electron": "*",
+    "electron": "^42.2.0",
     "react": "*",
     "react-dom": "*"
   },
