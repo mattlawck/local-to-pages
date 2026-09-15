@@ -38,6 +38,8 @@
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "react": "^16.14.0",
+    "react-dom": "^16.14.0",
     "@types/react-router-dom": "^5.3.3",
     "@types/turndown": "^5.0.4",
     "css-loader": "^7.1.4",
@@ -56,5 +58,10 @@
     "electron": "*",
     "react": "*",
     "react-dom": "*"
+  },
+  "overrides": {
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    }
   }
 }
