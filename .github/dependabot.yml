@@ -48,6 +48,16 @@ updates:
       - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
 
+      # electron is supplied by Local at runtime; our declared version exists
+      # only so TypeScript describes the API the add-on really runs against.
+      # It must track what @getflywheel/local depends on (electron ^42.2.0 for
+      # Local 10.1.2), not the newest electron published — a "*" here is how
+      # this project came to typecheck against electron 44 while Local shipped
+      # 42. src/__tests__/electron-version-alignment.test.ts fails CI if the
+      # two drift, which is the signal to re-pin after a Local upgrade.
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]
+
   # ---------------------------------------------------------------------------
   # Composer (WordPress companion plugin lint tooling)
   # Previously only reached by grouped *security* updates; this enables routine
