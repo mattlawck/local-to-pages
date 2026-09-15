@@ -3,6 +3,7 @@ import * as LocalMain from '@getflywheel/local/main';
 import { IPC, SiteConfig } from '../shared/types';
 import { getConfig, saveConfig, getStoreStatus } from './store';
 import { runDeployPipeline } from './deploy';
+import { runPreflight } from './preflight';
 import { findMysqlSocket } from './simplystatic';
 
 async function fetchSiteInfo(siteUrl: string): Promise<{ title: string; description: string }> {
@@ -33,12 +34,8 @@ async function executeDeploy(event: Electron.IpcMainEvent, siteId: string): Prom
       return;
     }
 
-    const serviceContainer = LocalMain.getServiceContainer().cradle;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const site = (serviceContainer as any).siteData.getSite(siteId);
-    const siteUrl = site.url?.startsWith('http') ? site.url : `http://${site.url || 'localhost'}`;
+    const { site, siteUrl, phpVersion } = resolveSite(siteId);
     const { title, description } = await fetchSiteInfo(siteUrl);
-    const phpVersion = site.services?.php?.version || site.phpVersion || '8.1';
 
     const pagesUrl = await runDeployPipeline({
       siteId,
@@ -62,7 +59,44 @@ async function executeDeploy(event: Electron.IpcMainEvent, siteId: string): Prom
   }
 }
 
+/** Resolves the Local site record and the values the pipeline derives from it. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function resolveSite(siteId: string): { site: any; siteUrl: string; phpVersion: string } {
+  const serviceContainer = LocalMain.getServiceContainer().cradle;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const site = (serviceContainer as any).siteData.getSite(siteId);
+  const siteUrl = site.url?.startsWith('http') ? site.url : `http://${site.url || 'localhost'}`;
+  const phpVersion = site.services?.php?.version || site.phpVersion || '8.1';
+  return { site, siteUrl, phpVersion };
+}
+
 export default function init(): void {
+  ipcMain.on(IPC.RUN_PREFLIGHT, async (event: Electron.IpcMainEvent, siteId: string) => {
+    const send = (channel: string, data: unknown) => event.sender.send(channel, data);
+    try {
+      const { site, siteUrl, phpVersion } = resolveSite(siteId);
+      const checks = await runPreflight({
+        siteId,
+        siteUrl,
+        siteWebRoot: site.paths.webRoot,
+        phpVersion,
+        config: getConfig(siteId),
+      });
+      send(IPC.PREFLIGHT_RESULT, { siteId, checks });
+    } catch (err: unknown) {
+      // A preflight that cannot run is itself a finding, not a crash.
+      send(IPC.PREFLIGHT_RESULT, {
+        siteId,
+        checks: [{
+          name: 'Local add-on API',
+          status: 'fail',
+          detail: err instanceof Error ? err.message : String(err),
+          remedy: 'This usually means Local changed an internal API. Check for an add-on update.',
+        }],
+      });
+    }
+  });
+
   ipcMain.on(IPC.GET_CONFIG, (event: Electron.IpcMainEvent, siteId: string) => {
     const config = getConfig(siteId);
     event.reply(IPC.CONFIG_DATA, { siteId, config });

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { DeployStep } from '../shared/types';
+import { DeployStep, PreflightCheck } from '../shared/types';
 
 interface Props {
   step: DeployStep;
@@ -9,6 +9,9 @@ interface Props {
   onDeploy: () => void;
   siteNotRunning?: boolean;
   onCancelNotRunning?: () => void;
+  preflight?: PreflightCheck[] | null;
+  preflightRunning?: boolean;
+  onRunPreflight?: () => void;
 }
 
 const STEPS: Array<{ key: DeployStep; label: string }> = [
@@ -30,6 +33,9 @@ export const DeployPanel: React.FC<Props> = ({
   onDeploy,
   siteNotRunning,
   onCancelNotRunning,
+  preflight,
+  preflightRunning,
+  onRunPreflight,
 }) => {
   const logRef = React.useRef<HTMLDivElement>(null);
   const isRunning =
@@ -49,6 +55,13 @@ export const DeployPanel: React.FC<Props> = ({
   return (
     <div style={styles.container}>
       <h3 style={styles.heading}>Deploy to Cloudflare Pages</h3>
+
+      <PreflightSection
+        checks={preflight}
+        running={preflightRunning}
+        onRun={onRunPreflight}
+        disabled={isRunning}
+      />
 
       {/* Step indicators */}
       <div style={styles.steps}>
@@ -147,6 +160,84 @@ export const DeployPanel: React.FC<Props> = ({
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+};
+
+const STATUS_STYLE: Record<PreflightCheck['status'], { icon: string; color: string }> = {
+  ok: { icon: '✓', color: '#38a169' },
+  warn: { icon: '!', color: '#b7791f' },
+  fail: { icon: '✕', color: '#e53e3e' },
+};
+
+/**
+ * Environment checks, shown above the deploy button.
+ *
+ * This pipeline runs infrequently while Local, WordPress and Staatic keep
+ * moving, so a deploy is usually the first run after an unknown number of
+ * upstream changes. Surfacing what broke — and what to do — beats discovering
+ * it from a stack trace partway through a publish.
+ */
+const PreflightSection: React.FC<{
+  checks?: PreflightCheck[] | null;
+  running?: boolean;
+  onRun?: () => void;
+  disabled?: boolean;
+}> = ({ checks, running, onRun, disabled }) => {
+  if (!onRun) return null;
+
+  const failures = checks?.filter((c) => c.status === 'fail').length ?? 0;
+  const warnings = checks?.filter((c) => c.status === 'warn').length ?? 0;
+
+  let summary: React.ReactNode = null;
+  if (checks) {
+    if (failures > 0) {
+      summary = <span style={{ color: '#e53e3e' }}>{failures} blocking issue{failures > 1 ? 's' : ''}</span>;
+    } else if (warnings > 0) {
+      summary = <span style={{ color: '#b7791f' }}>Ready, with {warnings} warning{warnings > 1 ? 's' : ''}</span>;
+    } else {
+      summary = <span style={{ color: '#38a169' }}>All checks passed</span>;
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 16, border: '1px solid #e0e0e0', borderRadius: 4, padding: '10px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          onClick={onRun}
+          disabled={running || disabled}
+          style={{
+            padding: '5px 12px',
+            fontSize: 12,
+            cursor: running || disabled ? 'default' : 'pointer',
+            border: '1px solid #c8c8c8',
+            borderRadius: 3,
+            background: '#fafafa',
+            opacity: running || disabled ? 0.6 : 1,
+          }}
+        >
+          {running ? 'Checking…' : 'Check environment'}
+        </button>
+        <span style={{ fontSize: 12 }}>{summary}</span>
+      </div>
+
+      {checks && (
+        <ul style={{ listStyle: 'none', margin: '10px 0 0', padding: 0, fontSize: 12 }}>
+          {checks.map((check) => {
+            const tone = STATUS_STYLE[check.status];
+            return (
+              <li key={check.name} style={{ marginBottom: 6, lineHeight: 1.45 }}>
+                <span style={{ color: tone.color, fontWeight: 700, marginRight: 6 }}>{tone.icon}</span>
+                <strong>{check.name}</strong>
+                <div style={{ marginLeft: 18, color: '#555', wordBreak: 'break-all' }}>{check.detail}</div>
+                {check.remedy && (
+                  <div style={{ marginLeft: 18, color: tone.color }}>{check.remedy}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );
