@@ -20,7 +20,8 @@ const EMPTY_CONFIG: SiteConfig = {
 /** How the config store ended up in its current state, for surfacing in the UI. */
 export type StoreStatus =
   | { kind: 'ok' }
-  | { kind: 'reset'; backupPath: string; reason: string };
+  | { kind: 'reset'; backupPath: string; reason: string }
+  | { kind: 'unencrypted'; reason: string };
 
 let storeStatus: StoreStatus = { kind: 'ok' };
 
@@ -37,11 +38,14 @@ function configFilePath(): string {
 }
 
 /**
- * Returns the AES-256 key for the config store, or null if one cannot be obtained.
+ * Returns the AES-256 key for the config store, or null only when the Keychain
+ * itself cannot serve us at all.
  *
- * Returns null rather than throwing: the add-on must load even when the
- * Keychain cannot serve us. A failed decrypt deliberately does NOT overwrite
- * the key file, so a transient Keychain failure cannot destroy a good key.
+ * If an existing key blob will not decrypt — which happens when it was sealed
+ * by a differently-signed build of Local — it is preserved alongside and a
+ * fresh key is minted. Returning null in that case would be actively harmful:
+ * the caller would fall back to an unencrypted store and write the Cloudflare
+ * API token to disk in plaintext.
  */
 function loadEncryptionKey(): string | null {
   const keyPath = keyFilePath();
@@ -50,16 +54,34 @@ function loadEncryptionKey(): string | null {
     try {
       return safeStorage.decryptString(fs.readFileSync(keyPath));
     } catch {
-      return null;
+      // Unusable blob. Keep it (a future OS/Keychain state might read it) but
+      // move it aside so a working key can take its place.
+      try {
+        fs.renameSync(keyPath, `${keyPath}.${Date.now()}.bak`);
+      } catch {
+        // If it cannot be moved it will simply be overwritten below.
+      }
     }
   }
 
   try {
     const newKey = crypto.randomBytes(32).toString('hex');
-    fs.writeFileSync(keyPath, safeStorage.encryptString(newKey));
+    fs.writeFileSync(keyPath, safeStorage.encryptString(newKey), { mode: 0o600 });
     return newKey;
   } catch {
     return null;
+  }
+}
+
+/**
+ * True when a config file exists and holds more than an empty object, i.e. it
+ * has real content that should have deserialized into settings.
+ */
+function hasStoredContent(): boolean {
+  try {
+    return fs.statSync(configFilePath()).size > 2;
+  } catch {
+    return false;
   }
 }
 
@@ -82,22 +104,44 @@ function buildStore(): Store<Record<string, SiteConfig>> {
   const encryptionKey = safeStorage.isEncryptionAvailable() ? loadEncryptionKey() : null;
 
   if (encryptionKey) {
+    let opened: Store<Record<string, SiteConfig>>;
     try {
-      return new Store<Record<string, SiteConfig>>({ ...baseOptions, encryptionKey });
+      opened = new Store<Record<string, SiteConfig>>({ ...baseOptions, encryptionKey });
     } catch {
       // Key is usable but the payload still will not decrypt — preserve and reset.
       setAsideConfig('Saved settings could not be decrypted and were reset.');
       return new Store<Record<string, SiteConfig>>({ ...baseOptions, encryptionKey });
     }
+
+    // `clearInvalidConfig` turns an unreadable config into an empty one without
+    // throwing, so the failure is otherwise invisible and the stale file is left
+    // on disk. A file with real content that deserialized to nothing did not
+    // decrypt — set it aside so it cannot linger, which matters especially when
+    // the stale file is unencrypted and holds an API token.
+    if (opened.size === 0 && hasStoredContent()) {
+      setAsideConfig('Saved settings could not be decrypted and were reset.');
+      return new Store<Record<string, SiteConfig>>({ ...baseOptions, encryptionKey });
+    }
+
+    return opened;
   }
 
-  // No usable key. An existing config is encrypted, so an unencrypted store must
-  // never be pointed at it — that is what previously fed ciphertext to JSON.parse.
+  // No key at all: the Keychain is unavailable, not merely holding a stale blob.
+  // An existing config is encrypted, so an unencrypted store must never be
+  // pointed at it — that is what previously fed ciphertext to JSON.parse.
   if (fs.existsSync(configFilePath())) {
     setAsideConfig(
-      'The macOS Keychain key protecting your settings was unavailable, so saved settings were reset.',
+      'The macOS Keychain was unavailable, so saved settings could not be read and were reset.',
     );
   }
+
+  // This store cannot encrypt, so the Cloudflare API token would rest on disk in
+  // plaintext. Record it so the UI can say so rather than failing silently.
+  storeStatus = {
+    kind: 'unencrypted',
+    reason:
+      'The macOS Keychain is unavailable, so settings are stored unencrypted. Your Cloudflare API token is written to disk in plaintext.',
+  };
 
   return new Store<Record<string, SiteConfig>>(baseOptions);
 }
@@ -140,4 +184,20 @@ export function getConfig(siteId: string): SiteConfig {
 
 export function saveConfig(siteId: string, config: SiteConfig): void {
   getStore().set(siteId, config);
+  restrictConfigPermissions();
+}
+
+/**
+ * Restricts the config file to owner-only access.
+ *
+ * conf creates it with the process umask, which left it world-readable
+ * (rw-rw-rw-). That matters because the file holds a Cloudflare API token —
+ * and matters most in the degraded case where it could not be encrypted.
+ */
+function restrictConfigPermissions(): void {
+  try {
+    fs.chmodSync(configFilePath(), 0o600);
+  } catch {
+    // Best effort; never block a save over file permissions.
+  }
 }
