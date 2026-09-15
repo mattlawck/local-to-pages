@@ -3,3 +3,6 @@ dist/
 *.key
 *.tgz
 .DS_Store
+
+# Composer install output (WordPress plugin lint tooling)
+wordpress-plugin/vendor/
