@@ -16,34 +16,95 @@ function findWpCli(): string {
   return wpCliPhar;
 }
 
-/**
- * Finds the PHP binary for a given site's PHP version.
- */
-function findPhp(phpVersion: string): string {
-  const localServicesBase = path.join(
+/** Local uses an architecture-specific subdirectory (e.g. darwin-arm64). */
+const PHP_ARCH_SUBDIRS = ['darwin-arm64', 'darwin-x64', 'darwin'];
+
+function lightningServicesBase(): string {
+  return path.join(
     process.env.HOME || '',
     'Library',
     'Application Support',
     'Local',
     'lightning-services',
   );
+}
 
-  // Local uses architecture-specific subdirectory (e.g. darwin-arm64)
-  const archSubdirs = ['darwin-arm64', 'darwin-x64', 'darwin'];
-  const phpVersionDir = path.join(localServicesBase, `php-${phpVersion}`, 'bin');
-
-  for (const arch of archSubdirs) {
-    const candidate = path.join(phpVersionDir, arch, 'bin', 'php');
+/** Returns the php binary inside a lightning-services directory, or null. */
+function phpBinaryIn(baseDir: string, serviceDir: string): string | null {
+  for (const arch of PHP_ARCH_SUBDIRS) {
+    const candidate = path.join(baseDir, serviceDir, 'bin', arch, 'bin', 'php');
     if (fs.existsSync(candidate)) return candidate;
   }
+  return null;
+}
 
-  // Fallback: find any php version
-  const entries = fs.readdirSync(localServicesBase);
-  const phpDirs = entries.filter((e) => e.startsWith('php-')).sort().reverse();
-  for (const phpDir of phpDirs) {
-    for (const arch of archSubdirs) {
-      const candidate = path.join(localServicesBase, phpDir, 'bin', arch, 'bin', 'php');
-      if (fs.existsSync(candidate)) return candidate;
+/**
+ * Compares Local's build suffix, so php-8.2.27+10 sorts above php-8.2.27+9.
+ * Missing or non-numeric suffixes sort lowest.
+ */
+export function buildNumber(serviceDir: string): number {
+  const suffix = serviceDir.split('+')[1];
+  const parsed = Number.parseInt(suffix ?? '', 10);
+  return Number.isNaN(parsed) ? -1 : parsed;
+}
+
+/**
+ * Picks the lightning-services directories serving a given PHP version,
+ * newest build first.
+ *
+ * Matching is on the version segment alone because Local names directories
+ * with a build suffix ("php-8.2.27+1") while reporting a bare version
+ * ("8.2.27"), so an equality check against the reported string never matches.
+ */
+export function selectPhpServiceDirs(dirs: string[], phpVersion: string): string[] {
+  return dirs
+    .filter((entry) => entry.split('+')[0] === `php-${phpVersion}`)
+    .sort((a, b) => buildNumber(b) - buildNumber(a));
+}
+
+/**
+ * Resolves the PHP binary for a site's PHP version.
+ *
+ * Local reports a bare version (services.php.version is "8.2.27") but names
+ * the directory with a build suffix ("php-8.2.27+1"), so joining the reported
+ * version directly never matches. That miss was silent: the old code fell
+ * through to "newest php-* directory", which on a machine with 8.2.27 and
+ * 8.2.29 installed ran WP-CLI on 8.2.29 while the site itself ran 8.2.27.
+ *
+ * Directories for the requested version are matched on the version segment
+ * alone and the highest build is preferred. Falling back to a different
+ * version is still better than failing the deploy, but it is now reported
+ * through onLog instead of happening invisibly.
+ */
+function findPhp(phpVersion: string, onLog?: (msg: string) => void): string {
+  const baseDir = lightningServicesBase();
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(baseDir);
+  } catch {
+    throw new Error(`Local lightning-services directory not found at: ${baseDir}`);
+  }
+
+  const phpDirs = entries.filter((entry) => entry.startsWith('php-'));
+  const matching = selectPhpServiceDirs(phpDirs, phpVersion);
+
+  for (const dir of matching) {
+    const binary = phpBinaryIn(baseDir, dir);
+    if (binary) return binary;
+  }
+
+  // Fall back to the newest available PHP, but say so — running WP-CLI on a
+  // different PHP than the site is a real difference in behaviour.
+  const fallbacks = [...phpDirs].sort().reverse();
+  for (const dir of fallbacks) {
+    const binary = phpBinaryIn(baseDir, dir);
+    if (binary) {
+      onLog?.(
+        `Warning: PHP ${phpVersion} not found in Local; using ${dir} instead. ` +
+          'The deploy may behave differently from the running site.',
+      );
+      return binary;
     }
   }
 
@@ -83,7 +144,7 @@ export function runWpCli(
   opts: WpCliOptions,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const php = findPhp(opts.phpVersion);
+    const php = findPhp(opts.phpVersion, opts.onLog);
     const wpCli = findWpCli();
     const socketPath = findMysqlSocket(opts.siteId);
 
