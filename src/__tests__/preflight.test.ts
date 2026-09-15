@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { overallStatus } from '../main/preflight';
 import { PreflightCheck } from '../shared/types';
 
-const check = (status: PreflightCheck['status'], name = status): PreflightCheck => ({
+const check = (status: PreflightCheck['status'], name: string = status): PreflightCheck => ({
   name,
   status,
   detail: 'detail',
