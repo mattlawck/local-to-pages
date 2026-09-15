@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
  * Local ships wp-cli.phar at:
  *   /Applications/Local.app/Contents/Resources/extraResources/bin/wp-cli/wp-cli.phar
  */
-function findWpCli(): string {
+export function findWpCli(): string {
   const wpCliPhar =
     '/Applications/Local.app/Contents/Resources/extraResources/bin/wp-cli/wp-cli.phar';
   if (!fs.existsSync(wpCliPhar)) {
@@ -19,7 +19,7 @@ function findWpCli(): string {
 /** Local uses an architecture-specific subdirectory (e.g. darwin-arm64). */
 const PHP_ARCH_SUBDIRS = ['darwin-arm64', 'darwin-x64', 'darwin'];
 
-function lightningServicesBase(): string {
+export function lightningServicesBase(): string {
   return path.join(
     process.env.HOME || '',
     'Library',
@@ -105,7 +105,7 @@ export function selectPhpServiceDirs(dirs: string[], phpVersion: string): string
  * version is still better than failing the deploy, but it is now reported
  * through onLog instead of happening invisibly.
  */
-function findPhp(phpVersion: string, onLog?: (msg: string) => void): string {
+export function findPhp(phpVersion: string, onLog?: (msg: string) => void): string {
   const baseDir = lightningServicesBase();
 
   let entries: string[];

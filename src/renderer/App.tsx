@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { IPC, SiteConfig, DeployStep, DeployState, StoreStatus } from '../shared/types';
+import { IPC, SiteConfig, DeployStep, DeployState, StoreStatus, PreflightCheck } from '../shared/types';
 import { ConfigPanel } from './ConfigPanel';
 import { DeployPanel } from './DeployPanel';
 
@@ -36,6 +36,8 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
   });
   const [siteNotRunning, setSiteNotRunning] = React.useState(false);
   const [storeStatus, setStoreStatus] = React.useState<StoreStatus>({ kind: 'ok' });
+  const [preflight, setPreflight] = React.useState<PreflightCheck[] | null>(null);
+  const [preflightRunning, setPreflightRunning] = React.useState(false);
 
   React.useEffect(() => {
     ipcRenderer.send(IPC.GET_CONFIG, siteId);
@@ -45,6 +47,11 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
     };
     const onStoreStatus = (_: unknown, payload: { siteId: string; status: StoreStatus }) => {
       if (payload.siteId === siteId) setStoreStatus(payload.status);
+    };
+    const onPreflight = (_: unknown, payload: { siteId: string; checks: PreflightCheck[] }) => {
+      if (payload.siteId !== siteId) return;
+      setPreflight(payload.checks);
+      setPreflightRunning(false);
     };
     const onLog = (_: unknown, payload: { siteId: string; message: string }) => {
       if (payload.siteId !== siteId) return;
@@ -70,6 +77,7 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
 
     ipcRenderer.on(IPC.CONFIG_DATA, onConfig);
     ipcRenderer.on(IPC.STORE_STATUS, onStoreStatus);
+    ipcRenderer.on(IPC.PREFLIGHT_RESULT, onPreflight);
     ipcRenderer.on(IPC.LOG, onLog);
     ipcRenderer.on(IPC.STEP, onStep);
     ipcRenderer.on(IPC.DONE, onDone);
@@ -79,6 +87,7 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
     return () => {
       ipcRenderer.removeListener(IPC.CONFIG_DATA, onConfig);
       ipcRenderer.removeListener(IPC.STORE_STATUS, onStoreStatus);
+      ipcRenderer.removeListener(IPC.PREFLIGHT_RESULT, onPreflight);
       ipcRenderer.removeListener(IPC.LOG, onLog);
       ipcRenderer.removeListener(IPC.STEP, onStep);
       ipcRenderer.removeListener(IPC.DONE, onDone);
@@ -90,6 +99,12 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
   const handleSaveConfig = (updated: SiteConfig) => {
     setConfig(updated);
     ipcRenderer.send(IPC.SAVE_CONFIG, { siteId, config: updated });
+  };
+
+  const handleRunPreflight = () => {
+    setPreflightRunning(true);
+    setPreflight(null);
+    ipcRenderer.send(IPC.RUN_PREFLIGHT, siteId);
   };
 
   const handleDeploy = () => {
@@ -119,6 +134,9 @@ export const App: React.FC<Props> = ({ siteId, ipcRenderer }) => {
             onDeploy={handleDeploy}
             siteNotRunning={siteNotRunning}
             onCancelNotRunning={handleCancelNotRunning}
+            preflight={preflight}
+            preflightRunning={preflightRunning}
+            onRunPreflight={handleRunPreflight}
           />
         ) : (
           <ConfigPanel config={config} onSave={handleSaveConfig} storeStatus={storeStatus} />
