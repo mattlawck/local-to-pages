@@ -1,16 +1,68 @@
 version: 2
 updates:
+  # ---------------------------------------------------------------------------
+  # npm (add-on)
+  #
+  # Minor and patch updates are grouped into a single weekly PR — they are
+  # routine and reviewing them individually is noise.
+  #
+  # Major updates are deliberately NOT grouped, so each arrives as its own PR.
+  # Grouping majors with minors means one unmergeable major blocks every other
+  # bump in the group indefinitely: PR #82 held 11 good updates hostage because
+  # typescript 7 is incompatible with typescript-eslint's peer range, which no
+  # published version has lifted yet.
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
     groups:
-      dev-dependencies:
+      dev-minor-patch:
         dependency-type: "development"
-      production-dependencies:
+        update-types: ["minor", "patch"]
+      prod-minor-patch:
         dependency-type: "production"
+        update-types: ["minor", "patch"]
     ignore:
-      # electron-store v9+ is ESM-only and incompatible with our CommonJS webpack build
+      # electron-store v9+ is ESM-only and incompatible with our CommonJS
+      # webpack build. Upgrading would require converting the main process to
+      # ESM — not worth it while this is a 0.x POC.
       - dependency-name: "electron-store"
         update-types: ["version-update:semver-major"]
+
+      # react/react-dom are pinned to 16.x on purpose: @getflywheel/local pins
+      # react@^16.13.1, and Local supplies react at runtime (webpack treats it
+      # as an external). Taking a major here would reintroduce the react 16 vs
+      # react-dom 18 peer conflict that --legacy-peer-deps used to mask.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  # ---------------------------------------------------------------------------
+  # Composer (WordPress companion plugin lint tooling)
+  # Previously only reached by grouped *security* updates; this enables routine
+  # version updates too, so tooling does not silently drift.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "composer"
+    directory: "/wordpress-plugin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      composer-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions — previously unmanaged, which is how checkout/setup-node sat
+  # on v4 until the Node 20 deprecation forced the issue.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
