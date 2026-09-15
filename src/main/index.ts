@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import * as LocalMain from '@getflywheel/local/main';
 import { IPC, SiteConfig } from '../shared/types';
-import { getConfig, saveConfig } from './store';
+import { getConfig, saveConfig, getStoreStatus } from './store';
 import { runDeployPipeline } from './deploy';
 import { findMysqlSocket } from './simplystatic';
 
@@ -66,6 +66,8 @@ export default function init(): void {
   ipcMain.on(IPC.GET_CONFIG, (event: Electron.IpcMainEvent, siteId: string) => {
     const config = getConfig(siteId);
     event.reply(IPC.CONFIG_DATA, { siteId, config });
+    // Reported after the config so the UI can explain empty or unencrypted settings.
+    event.reply(IPC.STORE_STATUS, { siteId, status: getStoreStatus() });
   });
 
   ipcMain.on(

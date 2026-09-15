@@ -38,6 +38,11 @@ export interface DoneEvent {
   pagesUrl: string;
 }
 
+export type StoreStatus =
+  | { kind: 'ok' }
+  | { kind: 'reset'; backupPath: string; reason: string }
+  | { kind: 'unencrypted'; reason: string };
+
 export interface ErrorEvent {
   siteId: string;
   error: string;
@@ -55,5 +60,6 @@ export const IPC = {
   DONE: 'local-to-pages:done',
   ERROR: 'local-to-pages:error',
   CONFIG_DATA: 'local-to-pages:config-data',
+  STORE_STATUS: 'local-to-pages:store-status',
   SITE_NOT_RUNNING: 'local-to-pages:site-not-running',
 } as const;
