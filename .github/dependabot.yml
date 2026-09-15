@@ -40,6 +40,14 @@ updates:
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
 
+      # The React typings must track the runtime react version, not lead it.
+      # On ^19 while running react 16, a React 18+ API would typecheck and then
+      # fail inside Local — the exact mistake type checking exists to prevent.
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+
   # ---------------------------------------------------------------------------
   # Composer (WordPress companion plugin lint tooling)
   # Previously only reached by grouped *security* updates; this enables routine
