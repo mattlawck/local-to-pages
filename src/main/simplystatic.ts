@@ -49,6 +49,35 @@ export function buildNumber(serviceDir: string): number {
 }
 
 /**
+ * Orders lightning-services directories newest first, comparing version
+ * segments numerically.
+ *
+ * A default `.sort()` compares UTF-16 code units, which gets version strings
+ * wrong the moment digit counts differ: "php-8.2.9" sorts above "php-8.2.29"
+ * because '9' > '2'. That is the same mistake this module already made by
+ * string-matching the version, so the fallback ordering is explicit too.
+ */
+export function compareServiceDirsNewestFirst(a: string, b: string): number {
+  const segments = (dir: string): number[] =>
+    (dir.split('+')[0].split('-')[1] ?? '')
+      .split('.')
+      .map((part) => {
+        const n = Number.parseInt(part, 10);
+        return Number.isNaN(n) ? -1 : n;
+      });
+
+  const left = segments(a);
+  const right = segments(b);
+
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    const diff = (right[i] ?? -1) - (left[i] ?? -1);
+    if (diff !== 0) return diff;
+  }
+
+  return buildNumber(b) - buildNumber(a);
+}
+
+/**
  * Picks the lightning-services directories serving a given PHP version,
  * newest build first.
  *
@@ -96,7 +125,7 @@ function findPhp(phpVersion: string, onLog?: (msg: string) => void): string {
 
   // Fall back to the newest available PHP, but say so — running WP-CLI on a
   // different PHP than the site is a real difference in behaviour.
-  const fallbacks = [...phpDirs].sort().reverse();
+  const fallbacks = [...phpDirs].sort(compareServiceDirsNewestFirst);
   for (const dir of fallbacks) {
     const binary = phpBinaryIn(baseDir, dir);
     if (binary) {
