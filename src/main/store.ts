@@ -3,7 +3,7 @@ import { app, safeStorage } from 'electron';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SiteConfig } from '../shared/types';
+import { SiteConfig, StoreStatus } from '../shared/types';
 
 const STORE_NAME = 'local-to-pages-config';
 const KEY_FILE = 'local-to-pages.key';
@@ -16,12 +16,6 @@ const EMPTY_CONFIG: SiteConfig = {
   staticOutputDir: '',
   customRedirects: '',
 };
-
-/** How the config store ended up in its current state, for surfacing in the UI. */
-export type StoreStatus =
-  | { kind: 'ok' }
-  | { kind: 'reset'; backupPath: string; reason: string }
-  | { kind: 'unencrypted'; reason: string };
 
 let storeStatus: StoreStatus = { kind: 'ok' };
 
@@ -49,26 +43,58 @@ function configFilePath(): string {
  */
 function loadEncryptionKey(): string | null {
   const keyPath = keyFilePath();
+  return readStoredKey(keyPath) ?? mintKey(keyPath);
+}
 
-  if (fs.existsSync(keyPath)) {
-    try {
-      return safeStorage.decryptString(fs.readFileSync(keyPath));
-    } catch {
-      // Unusable blob. Keep it (a future OS/Keychain state might read it) but
-      // move it aside so a working key can take its place.
-      try {
-        fs.renameSync(keyPath, `${keyPath}.${Date.now()}.bak`);
-      } catch {
-        // If it cannot be moved it will simply be overwritten below.
-      }
-    }
+/**
+ * Reads and decrypts the stored key, or returns null if there isn't a usable one.
+ *
+ * Deliberately attempts the read rather than testing with existsSync first:
+ * checking and then acting is a time-of-check/time-of-use race, and the missing
+ * file case is already just an ENOENT we can catch.
+ */
+function readStoredKey(keyPath: string): string | null {
+  let blob: Buffer;
+  try {
+    blob = fs.readFileSync(keyPath);
+  } catch {
+    return null; // absent or unreadable — mint a new one
   }
 
   try {
-    const newKey = crypto.randomBytes(32).toString('hex');
-    fs.writeFileSync(keyPath, safeStorage.encryptString(newKey), { mode: 0o600 });
-    return newKey;
+    return safeStorage.decryptString(blob);
   } catch {
+    // Unusable blob — typically sealed by a differently-signed build of Local.
+    // Keep it (a future Keychain state might read it) but move it aside so a
+    // working key can take its place.
+    try {
+      fs.renameSync(keyPath, `${keyPath}.${Date.now()}.bak`);
+    } catch {
+      // If it cannot be moved, the exclusive create below will fail and we
+      // degrade to an unencrypted store rather than silently overwriting it.
+    }
+    return null;
+  }
+}
+
+/**
+ * Creates a new key, failing rather than overwriting if one already exists.
+ *
+ * The `wx` flag makes the create atomic: if another Local process minted a key
+ * between our read and this write, we lose the race cleanly with EEXIST and
+ * adopt the winner's key instead of clobbering it — which would otherwise leave
+ * whichever process wrote second unable to read the other's config.
+ */
+function mintKey(keyPath: string): string | null {
+  const newKey = crypto.randomBytes(32).toString('hex');
+
+  try {
+    fs.writeFileSync(keyPath, safeStorage.encryptString(newKey), { flag: 'wx', mode: 0o600 });
+    return newKey;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      return readStoredKey(keyPath);
+    }
     return null;
   }
 }
@@ -88,14 +114,16 @@ function hasStoredContent(): boolean {
 /** Moves an unreadable config aside instead of letting it be read or overwritten keyless. */
 function setAsideConfig(reason: string): void {
   const configPath = configFilePath();
-  if (!fs.existsSync(configPath)) return;
-
   const backupPath = `${configPath}.${Date.now()}.bak`;
+
+  // Attempted directly rather than guarded by existsSync: the "no config yet"
+  // case is an ENOENT we catch anyway, and checking first would be a
+  // time-of-check/time-of-use race.
   try {
     fs.renameSync(configPath, backupPath);
     storeStatus = { kind: 'reset', backupPath, reason };
   } catch {
-    // Nothing further to try; start empty rather than blocking the add-on.
+    // Absent, or could not be moved; start empty rather than blocking the add-on.
   }
 }
 
@@ -129,7 +157,7 @@ function buildStore(): Store<Record<string, SiteConfig>> {
   // No key at all: the Keychain is unavailable, not merely holding a stale blob.
   // An existing config is encrypted, so an unencrypted store must never be
   // pointed at it — that is what previously fed ciphertext to JSON.parse.
-  if (fs.existsSync(configFilePath())) {
+  if (hasStoredContent()) {
     setAsideConfig(
       'The macOS Keychain was unavailable, so saved settings could not be read and were reset.',
     );

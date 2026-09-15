@@ -1,12 +1,13 @@
 import * as React from 'react';
-import { SiteConfig } from '../shared/types';
+import { SiteConfig, StoreStatus } from '../shared/types';
 
 interface Props {
   config: SiteConfig;
   onSave: (config: SiteConfig) => void;
+  storeStatus?: StoreStatus;
 }
 
-export const ConfigPanel: React.FC<Props> = ({ config, onSave }) => {
+export const ConfigPanel: React.FC<Props> = ({ config, onSave, storeStatus }) => {
   const [form, setForm] = React.useState<SiteConfig>(config);
   const [saved, setSaved] = React.useState(false);
 
@@ -28,6 +29,7 @@ export const ConfigPanel: React.FC<Props> = ({ config, onSave }) => {
 
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
+      <StoreNotice status={storeStatus} />
       <h3 style={styles.heading}>Cloudflare Pages Settings</h3>
 
       <Field
@@ -125,6 +127,49 @@ const Field: React.FC<FieldProps> = ({
         spellCheck={false}
       />
       <p style={styles.hint}>{hint}</p>
+    </div>
+  );
+};
+
+/**
+ * Explains a degraded config store, so blank settings or an unencrypted token
+ * are visible in the UI rather than only in the logs.
+ */
+const StoreNotice: React.FC<{ status?: StoreStatus }> = ({ status }) => {
+  if (!status || status.kind === 'ok') return null;
+
+  const isUnencrypted = status.kind === 'unencrypted';
+  const tone = isUnencrypted
+    ? { background: '#fdecea', border: '#f5c6cb', color: '#8a1f1f' }
+    : { background: '#fff8e1', border: '#ffe0a3', color: '#7a5600' };
+
+  return (
+    <div
+      role="alert"
+      style={{
+        background: tone.background,
+        border: `1px solid ${tone.border}`,
+        color: tone.color,
+        borderRadius: 4,
+        padding: '10px 12px',
+        marginBottom: 14,
+        fontSize: 12,
+        lineHeight: 1.5,
+      }}
+    >
+      <strong>{isUnencrypted ? 'Settings are not encrypted' : 'Saved settings were reset'}</strong>
+      <div style={{ marginTop: 4 }}>{status.reason}</div>
+      {status.kind === 'reset' && (
+        <div style={{ marginTop: 4 }}>
+          Your previous file was kept at <code>{status.backupPath}</code>. Re-enter the fields below
+          and save.
+        </div>
+      )}
+      {isUnencrypted && (
+        <div style={{ marginTop: 4 }}>
+          Consider rotating your Cloudflare API token once the Keychain is available again.
+        </div>
+      )}
     </div>
   );
 };
