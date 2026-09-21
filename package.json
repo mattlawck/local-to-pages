@@ -36,7 +36,7 @@
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.59.1",
     "@typescript-eslint/parser": "^8.0.0",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.1",
     "@types/react": "^16.14.0",
     "@types/react-dom": "^16.9.0",
     "react": "^16.14.0",
@@ -52,7 +52,7 @@
     "ts-loader": "^9.5.7",
     "typescript": "^6.0.3",
     "vitest": "^5.0.0",
-    "webpack": "^5.106.2",
+    "webpack": "^5.111.1",
     "webpack-cli": "^7.0.2"
   },
   "peerDependencies": {
